@@ -1,8 +1,9 @@
 import { all, one, run, nowIso, audit } from "./db";
-import { POLICY, SCOPES, type ScopeKey } from "./policy";
-import { bandFor, tallyFromRows, computeThreshold, type Tally, EMPTY_TALLY } from "./scoring";
+import { POLICY, SCOPES, AUDIENCES, type ScopeKey, type Audience, type Group } from "./policy";
+import { bandFor, tallyFromRows, computeThreshold, emptyTally, type Tally } from "./scoring";
 import type { Status } from "./status";
 import { addMonths, addWorkingDays } from "./format";
+import { shortDivision } from "./auth";
 
 export type Initiative = {
   id: number;
@@ -10,10 +11,12 @@ export type Initiative = {
   summary: string;
   body: string;
   category: string;
+  audience: Audience;
   scope: ScopeKey;
   scope_ref: string;
   author_id: number | null;
   author_name: string;
+  author_group: Group;
   status: Status;
   eligible_count: number;
   threshold_voters: number;
@@ -46,11 +49,12 @@ export type CouncilDecision = {
 };
 
 export function tallyFor(initiativeId: number): Tally {
-  const rows = all<{ value: number; n: number }>(
-    `SELECT value, COUNT(*) n FROM votes WHERE initiative_id = ? GROUP BY value`,
+  const rows = all<{ value: number; voter_group: string; n: number }>(
+    `SELECT value, voter_group, COUNT(*) n FROM votes
+     WHERE initiative_id = ? GROUP BY value, voter_group`,
     initiativeId
   );
-  if (!rows.length) return { ...EMPTY_TALLY, dist: { 2: 0, 1: 0, 0: 0, [-1]: 0, [-2]: 0 } };
+  if (!rows.length) return emptyTally();
   return tallyFromRows(rows);
 }
 
@@ -82,7 +86,6 @@ export function decisionFor(id: number) {
 export function syncLifecycle() {
   const now = nowIso();
 
-  // 1. Хугацаа дууссан санал хураалтуудыг хаах
   const ended = all<Initiative>(
     `SELECT * FROM initiatives WHERE status = 'ACTIVE' AND ends_at IS NOT NULL AND ends_at <= ?`,
     now
@@ -114,7 +117,6 @@ export function syncLifecycle() {
     );
   }
 
-  // 2. Хүчинтэй хугацаа нь дууссан батлагдсан санаачилгыг архивлах
   const expired = all<{ id: number }>(
     `SELECT id FROM initiatives
      WHERE status IN ('IN_PROGRESS','COMPLETED') AND valid_until IS NOT NULL AND valid_until <= ?`,
@@ -153,13 +155,20 @@ export function decorate(init: Initiative): Card {
   };
 }
 
-export function listPublic(statuses: Status[], opts: { category?: string; q?: string } = {}) {
+export function listPublic(
+  statuses: Status[],
+  opts: { category?: string; audience?: Audience; q?: string } = {}
+) {
   const ph = statuses.map(() => "?").join(",");
   const params: (string | number)[] = [...statuses];
   let sql = `SELECT * FROM initiatives WHERE status IN (${ph})`;
   if (opts.category) {
     sql += ` AND category = ?`;
     params.push(opts.category);
+  }
+  if (opts.audience) {
+    sql += ` AND audience = ?`;
+    params.push(opts.audience);
   }
   if (opts.q) {
     sql += ` AND (title LIKE ? OR summary LIKE ?)`;
@@ -196,8 +205,7 @@ export function implementationBoard() {
 
 /** Нээлттэй байдлын үзүүлэлтүүд — нүүр хуудасны статистик. */
 export function stats() {
-  const q = (sql: string, ...p: (string | number)[]) =>
-    one<{ n: number }>(sql, ...p)?.n ?? 0;
+  const q = (sql: string, ...p: (string | number)[]) => one<{ n: number }>(sql, ...p)?.n ?? 0;
 
   const overdue = councilQueue().filter((c) => {
     const dl = councilDeadline(c);
@@ -213,16 +221,24 @@ export function stats() {
     failed: q(`SELECT COUNT(*) n FROM initiatives WHERE status = 'FAILED'`),
     voters: q(`SELECT COUNT(DISTINCT voter_key) n FROM votes`),
     votes: q(`SELECT COUNT(*) n FROM votes`),
-    students: q(`SELECT COUNT(*) n FROM users WHERE active = 1`),
+    members: q(`SELECT COUNT(*) n FROM users WHERE active = 1`),
+    students: q(`SELECT COUNT(*) n FROM users WHERE active = 1 AND group_key = 'STUDENT'`),
+    teachers: q(`SELECT COUNT(*) n FROM users WHERE active = 1 AND group_key = 'TEACHER'`),
+    staff: q(`SELECT COUNT(*) n FROM users WHERE active = 1 AND group_key = 'STAFF'`),
     overdue,
   };
 }
 
+/** "МХТС · 3-р курс" маягийн товч тайлбар */
 export function scopeLabel(scope: ScopeKey, ref: string) {
   if (scope === "SCHOOL") return SCOPES.SCHOOL.label;
-  if (scope === "FACULTY") return ref;
-  const [faculty, year] = ref.split("|");
-  return `${faculty} · ${year}-р курс`;
+  if (scope === "DIVISION") return shortDivision(ref);
+  const [division, year] = ref.split("|");
+  return `${shortDivision(division)} · ${year}-р курс`;
+}
+
+export function audienceLabel(a: Audience) {
+  return AUDIENCES[a]?.short ?? a;
 }
 
 export function thresholdFor(scope: ScopeKey, eligible: number) {

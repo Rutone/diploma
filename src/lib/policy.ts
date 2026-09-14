@@ -8,32 +8,129 @@
  * өгөгдлөөр калибрлах боломжтой байх ёстой.
  */
 
-export type ScopeKey = "CLASS" | "FACULTY" | "SCHOOL";
+/* ═══ Бүлэг: хэрэглэгч хэн болох ═════════════════════════════════
+   Энэ нь ЭРХЭЭС (role) тусдаа ойлголт. Багш нэгэн зэрэг модератор,
+   ажилтан нэгэн зэрэг зөвлөлийн гишүүн байж болно.                */
+
+export type Group = "STUDENT" | "TEACHER" | "STAFF";
+
+export const GROUPS: Record<
+  Group,
+  { label: string; plural: string; tone: "blue" | "violet" | "amber"; divisionWord: string; roleWord: string }
+> = {
+  STUDENT: {
+    label: "Оюутан",
+    plural: "Оюутнууд",
+    tone: "blue",
+    divisionWord: "Салбар сургууль",
+    roleWord: "Мэргэжил",
+  },
+  TEACHER: {
+    label: "Багш",
+    plural: "Багш нар",
+    tone: "violet",
+    divisionWord: "Салбар сургууль",
+    roleWord: "Тэнхим",
+  },
+  STAFF: {
+    label: "Ажилтан",
+    plural: "Ажилтнууд",
+    tone: "amber",
+    divisionWord: "Нэгж",
+    roleWord: "Албан тушаал",
+  },
+};
+
+export const GROUP_ORDER: Group[] = ["STUDENT", "TEACHER", "STAFF"];
+
+/* ═══ Эрх: хэрэглэгч юу удирдах вэ ═══════════════════════════════ */
+
+export type Role = "MEMBER" | "MODERATOR" | "COUNCIL" | "ADMIN";
+
+export const ROLES: Record<Role, { label: string }> = {
+  MEMBER: { label: "Гишүүн" },
+  MODERATOR: { label: "Модератор" },
+  COUNCIL: { label: "Зөвлөлийн гишүүн" },
+  ADMIN: { label: "Админ" },
+};
+
+/* ═══ Хамрах бүлэг: санаачилга хэнд хамаарах вэ ══════════════════ */
+
+export type Audience = "ALL" | "STUDENT" | "TEACHER" | "STAFF" | "EMPLOYEE";
+
+export const AUDIENCES: Record<
+  Audience,
+  { label: string; short: string; groups: Group[]; hint: string }
+> = {
+  ALL: {
+    label: "Бүх нийт",
+    short: "Бүх нийт",
+    groups: ["STUDENT", "TEACHER", "STAFF"],
+    hint: "Оюутан, багш, ажилтан гурвуулаа санал өгнө. Үр дүн бүлэг тус бүрээр тусад нь харагдана.",
+  },
+  STUDENT: {
+    label: "Зөвхөн оюутнууд",
+    short: "Оюутан",
+    groups: ["STUDENT"],
+    hint: "Зөвхөн оюутнууд санал өгнө.",
+  },
+  TEACHER: {
+    label: "Зөвхөн багш нар",
+    short: "Багш",
+    groups: ["TEACHER"],
+    hint: "Зөвхөн багш нар санал өгнө.",
+  },
+  STAFF: {
+    label: "Зөвхөн ажилтнууд",
+    short: "Ажилтан",
+    groups: ["STAFF"],
+    hint: "Зөвхөн захиргаа, үйлчилгээний ажилтнууд санал өгнө.",
+  },
+  EMPLOYEE: {
+    label: "Багш, ажилтан",
+    short: "Албан хаагч",
+    groups: ["TEACHER", "STAFF"],
+    hint: "Сургуулийн албан хаагчид (багш ба ажилтан) санал өгнө. Оюутан оролцохгүй.",
+  },
+};
+
+/** Тухайн бүлэгт хамаарах хүн ямар хамрах бүлэгтэй санаачилга үүсгэж болох вэ.
+ *  Дүрэм: зөвхөн ӨӨРИЙН бүлэг багтсан санаачилга дэвшүүлнэ. */
+export function audiencesFor(group: Group): Audience[] {
+  return (Object.keys(AUDIENCES) as Audience[]).filter((a) =>
+    AUDIENCES[a].groups.includes(group)
+  );
+}
+
+/* ═══ Зохион байгуулалтын хүрээ ══════════════════════════════════ */
+
+export type ScopeKey = "CLASS" | "DIVISION" | "SCHOOL";
 
 export const SCOPES: Record<
   ScopeKey,
-  { label: string; short: string; percent: number; days: number; hint: string }
+  { label: string; short: string; percent: number; days: number; hint: string; studentsOnly?: boolean }
 > = {
   CLASS: {
-    label: "Анги / курс",
+    label: "Анги, курс",
     short: "Курс",
     percent: 15,
     days: 7,
-    hint: "Зөвхөн өөрийн салбарын тухайн курсын оюутнууд санал өгнө.",
+    hint: "Зөвхөн тухайн салбарын тэр курсын оюутнууд санал өгнө.",
+    studentsOnly: true,
   },
-  FACULTY: {
-    label: "Тэнхим / салбар",
-    short: "Салбар",
+  DIVISION: {
+    label: "Салбар сургууль / нэгж",
+    short: "Нэгж",
     percent: 8,
     days: 14,
-    hint: "Тухайн салбар сургуулийн бүх оюутан санал өгнө.",
+    hint: "Тухайн салбар сургууль буюу албан нэгжид харьяалагдах хүмүүс санал өгнө.",
   },
   SCHOOL: {
-    label: "Сургууль даяар",
-    short: "Сургууль",
+    label: "Их сургууль даяар",
+    short: "Их сургууль",
     percent: 5,
     days: 30,
-    hint: "Их сургуулийн бүх оюутан санал өгнө.",
+    hint: "Их сургуулийн бүх харьяат санал өгнө.",
   },
 };
 
@@ -49,8 +146,7 @@ export const POLICY = {
    *  "We the People" системийн дундаж 163 хоног нь уг платформыг үхүүлсэн. */
   COUNCIL_RESPONSE_DAYS: 10,
 
-  /** Зөвлөлийн хариу хамгийн багадаа хэдэн тэмдэгт байх вэ.
-   *  "Татгалзав" гэсэн ганц үг хүлээн авахгүй. */
+  /** Зөвлөлийн хариу хамгийн багадаа хэдэн тэмдэгт байх вэ. */
   MIN_REASONING_CHARS: 200,
 
   /** Сэтгэгдэл засах боломжтой хугацаа (минут). */
@@ -64,6 +160,13 @@ export const POLICY = {
 
   /** ★★ авсан санаачилгыг хэдэн сарын дараа дахин оруулж болох вэ. */
   RESUBMIT_MONTHS: 3,
+
+  /**
+   * Олон бүлэгт хамаарах санаачилгад аль нэг бүлгийн цэвэр оноо сөрөг
+   * байвал зөвлөлд тусгайлан анхааруулна. Цөөнх бүлгийн эрх ашгийг
+   * олонхи бүлэг дарахаас сэргийлэх механизм.
+   */
+  FLAG_OPPOSED_GROUP: true,
 
   /** Гарчиг, тайлбарын урт. */
   TITLE_MIN: 12,
@@ -135,7 +238,7 @@ export const STAR_BANDS = [
     minRatio: -Infinity,
     outcome: "FAILED" as const,
     veto: "—",
-    note: "Цэвэр оноо сөрөг — оюутнууд дэмжээгүй.",
+    note: "Цэвэр оноо сөрөг — санал өгсөн хүмүүс дэмжээгүй.",
   },
 ];
 
@@ -147,6 +250,7 @@ export const REJECTION_REASONS: Record<string, string> = {
   PERSONAL: "Тодорхой хувь хүн рүү чиглэсэн доромжлол агуулсан",
   PRIVACY: "Бусдын хувийн мэдээллийг зөвшөөрөлгүй нийтэлсэн",
   UNCLEAR: "Шаардаж буй үйлдэл нь тодорхойгүй",
+  WRONG_AUDIENCE: "Хамрах бүлэг буруу сонгогдсон",
   UNLAWFUL: "Хууль тогтоомж зөрчсөн",
   ADVERT: "Сурталчилгаа, арилжааны агуулгатай",
   SPAM: "Утгагүй эсвэл спам",
@@ -164,7 +268,8 @@ export const CATEGORIES: Record<string, string> = {
   ACADEMIC: "Хичээл, сургалт",
   FACILITY: "Байр, орчин",
   DORM: "Дотуур байр",
-  FINANCE: "Төлбөр, тэтгэлэг",
+  FINANCE: "Төлбөр, цалин",
+  WORKLOAD: "Ажлын ачаалал, нөхцөл",
   CLUB: "Клуб, арга хэмжээ",
   DIGITAL: "Цахим үйлчилгээ",
   OTHER: "Бусад",

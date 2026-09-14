@@ -32,7 +32,7 @@ export const STATUS_META: Record<
   ACTIVE: {
     label: "Санал хураалт явж байна",
     tone: "blue",
-    hint: "Эрх бүхий оюутнууд санал өгч байна.",
+    hint: "Хамрах бүлгийн эрх бүхий хүмүүс санал өгч байна.",
   },
   FAILED: {
     label: "Босго дүүрээгүй",

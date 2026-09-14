@@ -38,6 +38,11 @@ export function remaining(iso?: string | null): { text: string; overdue: boolean
   return { text: ms >= 0 ? `${core} үлдсэн` : `${core} хоцорсон`, overdue: ms < 0, ms };
 }
 
+export function isPastDue(iso?: string | null) {
+  if (!iso) return false;
+  return new Date(iso).getTime() < Date.now();
+}
+
 export function relative(iso?: string | null) {
   if (!iso) return "—";
   const ms = Date.now() - new Date(iso).getTime();
@@ -80,4 +85,18 @@ export function shortName(full: string) {
   const parts = full.trim().split(/\s+/);
   if (parts.length < 2) return full;
   return `${parts[0][0]}. ${parts.slice(1).join(" ")}`;
+}
+
+const MN_MONTH_WORDS = [
+  "нэгдүгээр", "хоёрдугаар", "гуравдугаар", "дөрөвдүгээр", "тавдугаар", "зургаадугаар",
+  "долоодугаар", "наймдугаар", "есдүгээр", "аравдугаар", "арван нэгдүгээр", "арван хоёрдугаар",
+];
+const MN_WEEKDAYS = [
+  "Ням гараг", "Даваа гараг", "Мягмар гараг", "Лхагва гараг",
+  "Пүрэв гараг", "Баасан гараг", "Бямба гараг",
+];
+
+/** "2026 оны есдүгээр сарын 13, Ням гараг" — порталын толгойн огнооны хэлбэр */
+export function fmtLongDate(d: Date = new Date()) {
+  return `${d.getFullYear()} оны ${MN_MONTH_WORDS[d.getMonth()]} сарын ${d.getDate()}, ${MN_WEEKDAYS[d.getDay()]}`;
 }

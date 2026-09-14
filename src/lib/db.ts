@@ -8,7 +8,6 @@ const DB_PATH = path.join(DB_DIR, "sanaachilga.db");
 const SCHEMA_PATH = path.join(process.cwd(), "src", "lib", "schema.sql");
 
 declare global {
-  // eslint-disable-next-line no-var
   var __sanaachilgaDb: DatabaseSync | undefined;
 }
 
