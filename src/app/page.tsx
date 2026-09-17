@@ -6,8 +6,10 @@ import { AUDIENCES, CATEGORIES, POLICY, SCOPES, type Audience, type ScopeKey } f
 import { STATUS_GROUPS, type Status } from "@/lib/status";
 import { fmtNum } from "@/lib/format";
 import {
-  IconMegaphone, IconUsers, IconClipboard, IconCheck, IconAlert, IconChart,
+  IconMegaphone, IconUsers, IconClipboard, IconCheck, IconAlert, IconChart, IconBulb, IconFlag,
+  IconInbox,
 } from "@/components/icons";
+import { feedbackTotals } from "@/lib/feedback";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +36,7 @@ export default async function Home({
 
   const user = await currentUser();
   const s = stats();
+  const fb = feedbackTotals();
   const items = listPublic(tab.statuses, { category: cat, audience: aud, q });
   const myDrafts = user
     ? listMine(user.id).filter((m) =>
@@ -59,16 +62,14 @@ export default async function Home({
               <IconMegaphone size={19} />
             </span>
             <div className="min-w-0">
-              <h2 className="text-[16px] font-medium">Оюутны санал санаачилга</h2>
+              <h2 className="text-[16px] font-medium">Санал, санаачилгын цахим платформ</h2>
               <p className="text-[12.5px] text-ink3 mb-2.5">
-                Оюутны холбоо · Сургуулийн зөвлөл
+                Оюутан · Багш · Ажилтан · Сургуулийн зөвлөл
               </p>
               <p className="text-[14.5px] text-ink2">
-                Санаачилга дэвшүүлж, санал өгнө. Босго давсан санаачилгыг сургуулийн зөвлөл{" "}
-                <strong className="font-medium" style={{ color: "var(--ink)" }}>
-                  {POLICY.COUNCIL_RESPONSE_DAYS} ажлын өдрийн дотор
-                </strong>{" "}
-                бичгээр хариулж, дэмжсэн бол хариуцагч томилж хэрэгжүүлэх үүрэгтэй.
+                Санал, гомдлоо хариуцах нэгжид шууд илгээж, олон хүнд хамаатай өөрчлөлтөд
+                санаачилга дэвшүүлж дэмжлэг цуглуулна. Хүсэлт бүрт хариуцагч тогтоосон
+                хугацаанд бичгээр хариулж, хоцрогдол нийтэд ил харагдана.
               </p>
               {!user && (
                 <Link href="/login" className="btn btn-primary btn-sm mt-3.5">
@@ -76,6 +77,38 @@ export default async function Home({
                 </Link>
               )}
             </div>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-2.5 mt-4 pt-4 border-t border-line">
+            <Link href={user ? "/initiatives/new" : "/login"} className="choice" style={{ padding: "11px 13px" }}>
+              <span className="choice-icon" style={{ width: 34, height: 34 }}>
+                <IconMegaphone size={18} />
+              </span>
+              <span className="min-w-0 leading-tight">
+                <span className="block text-[14px] font-medium">Санаачилга</span>
+                <span className="block text-[12px] text-ink3 mt-0.5">Дэмжлэг цуглуулах</span>
+              </span>
+            </Link>
+            <Link href={user ? "/feedback/new?kind=SUGGESTION" : "/login"} className="choice" style={{ padding: "11px 13px" }}>
+              <span className="choice-icon" style={{ width: 34, height: 34 }}>
+                <IconBulb size={18} />
+              </span>
+              <span className="min-w-0 leading-tight">
+                <span className="block text-[14px] font-medium">Санал</span>
+                <span className="block text-[12px] text-ink3 mt-0.5">Нэгжид сайжруулах санаа</span>
+              </span>
+            </Link>
+            <Link href={user ? "/feedback/new?kind=COMPLAINT" : "/login"} className="choice" style={{ padding: "11px 13px" }}>
+              <span
+                className="choice-icon"
+                style={{ width: 34, height: 34, background: "var(--warn-soft)", color: "var(--warn)" }}
+              >
+                <IconFlag size={18} />
+              </span>
+              <span className="min-w-0 leading-tight">
+                <span className="block text-[14px] font-medium">Гомдол</span>
+                <span className="block text-[12px] text-ink3 mt-0.5">Доголдол, зөрчил</span>
+              </span>
+            </Link>
           </div>
         </section>
 
@@ -192,9 +225,20 @@ export default async function Home({
             <InfoRow icon={<IconCheck />} label={`${fmtNum(s.completed)} санаачилга хэрэгжсэн`} />
             <InfoRow
               icon={<IconAlert />}
-              label={`${fmtNum(s.overdue)} хариу хоцорсон`}
+              label={`${fmtNum(s.overdue)} зөвлөлийн хариу хоцорсон`}
               danger={s.overdue > 0}
             />
+            <InfoRow
+              icon={<IconInbox size={16} />}
+              label={`${fmtNum(fb.received)} санал, гомдол · ${fb.onTimePct ?? "—"}% хугацаандаа хариулсан`}
+            />
+            {fb.overdue > 0 && (
+              <InfoRow
+                icon={<IconAlert />}
+                label={`${fmtNum(fb.overdue)} санал, гомдлын хариу хоцорсон`}
+                danger
+              />
+            )}
             <div className="pt-3 mt-2 border-t border-line text-[13px] text-ink3">
               Нийт {fmtNum(s.members)} гишүүн: {fmtNum(s.students)} оюутан ·{" "}
               {fmtNum(s.teachers)} багш · {fmtNum(s.staff)} ажилтан. {fmtNum(s.votes)} санал
@@ -204,7 +248,7 @@ export default async function Home({
         </section>
 
         <section className="card">
-          <div className="card-title">Хэрхэн ажилладаг вэ</div>
+          <div className="card-title">Санаачилга хэрхэн ажилладаг вэ</div>
           <ol className="p-4 space-y-3 text-[13.5px] text-ink2">
             {[
               [`Оюутан, багш, ажилтан санаачилга бичиж, хэн санал өгөхийг сонгоод ${POLICY.ENDORSEMENTS_REQUIRED} хүний урьдчилсан дэмжлэг цуглуулна.`],

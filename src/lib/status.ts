@@ -1,3 +1,5 @@
+import type { FeedbackStatus } from "./policy";
+
 export type Status =
   | "GATHERING"   // урьдчилсан дэмжигч цуглуулж буй
   | "MODERATION"  // хяналтад
@@ -81,3 +83,35 @@ export function isOpenForVoting(s: Status) {
 export function isPublic(s: Status) {
   return s !== "MODERATION" && s !== "RETURNED" && s !== "GATHERING";
 }
+
+/* ═══ Санал, гомдлын төлөв ═══════════════════════════════════════ */
+
+
+export const FEEDBACK_STATUS_META: Record<
+  FeedbackStatus,
+  { label: string; tone: "gray" | "violet" | "blue" | "amber" | "green" | "red"; hint: string }
+> = {
+  RECEIVED: {
+    label: "Хүлээн авсан",
+    tone: "violet",
+    hint: "Системд бүртгэгдэж, хариуцах нэгж рүү илгээгдсэн. Нэгж хүлээн авснаа баталгаажуулах хүлээгдэж байна.",
+  },
+  IN_REVIEW: {
+    label: "Шийдвэрлэж буй",
+    tone: "blue",
+    hint: "Хариуцах нэгж судалж байна. Нэмэлт мэдээлэл хэрэгтэй бол энд асууна.",
+  },
+  ANSWERED: {
+    label: "Хариу өгсөн",
+    tone: "green",
+    hint: "Нэгж эцсийн хариугаа өгсөн. Хариуг үнэлж хаах, эсвэл хангалтгүй бол дахин нээж болно.",
+  },
+  CLOSED: {
+    label: "Хаагдсан",
+    tone: "gray",
+    hint: "Хүсэлт шийдвэрлэгдэж хаагдсан. Түүх нь хадгалагдана.",
+  },
+};
+
+/** Хариу хүлээгдэж буй (хугацаа гүйж буй) төлвүүд. */
+export const FEEDBACK_OPEN: FeedbackStatus[] = ["RECEIVED", "IN_REVIEW"];

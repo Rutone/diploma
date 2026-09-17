@@ -26,6 +26,7 @@ import {
 } from "@/lib/policy";
 import { computeThreshold } from "@/lib/scoring";
 import { getInitiative, endorsementCount } from "@/lib/repo";
+import { addEvent, getFeedback, isFeedbackAuthor } from "@/lib/feedback";
 import { addDays, addMonths } from "@/lib/format";
 
 type Result = { ok: boolean; error?: string; info?: string };
@@ -128,6 +129,16 @@ export async function createInitiative(_prev: unknown, fd: FormData): Promise<Re
 
   const id = Number(res.lastInsertRowid);
   audit(user.name, "CREATE", "initiative", id, title);
+
+  // Санал, гомдлоос үүссэн бол хоёрыг холбоно — нэгж ба илгээгч хоёулаа мөшгинө.
+  const fromId = Number(fd.get("from") ?? 0);
+  const source = fromId ? getFeedback(fromId) : undefined;
+  if (source && isFeedbackAuthor(user, source) && !source.initiative_id) {
+    run(`UPDATE feedback SET initiative_id = ? WHERE id = ?`, id, source.id);
+    addEvent(source.id, "INITIATIVE", "AUTHOR", source.anonymous ? "" : user.name, `«${title}»`);
+    revalidatePath(`/feedback/${source.id}`);
+  }
+
   revalidatePath("/");
   redirect(`/initiatives/${id}`);
 }

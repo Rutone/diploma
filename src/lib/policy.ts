@@ -45,12 +45,14 @@ export const GROUP_ORDER: Group[] = ["STUDENT", "TEACHER", "STAFF"];
 
 /* ═══ Эрх: хэрэглэгч юу удирдах вэ ═══════════════════════════════ */
 
-export type Role = "MEMBER" | "MODERATOR" | "COUNCIL" | "ADMIN";
+/** HANDLER нь өөрийн нэгж (users.division)-д ирсэн санал, гомдлыг шийдвэрлэнэ. */
+export type Role = "MEMBER" | "MODERATOR" | "COUNCIL" | "HANDLER" | "ADMIN";
 
 export const ROLES: Record<Role, { label: string }> = {
   MEMBER: { label: "Гишүүн" },
   MODERATOR: { label: "Модератор" },
   COUNCIL: { label: "Зөвлөлийн гишүүн" },
+  HANDLER: { label: "Нэгжийн хариуцагч" },
   ADMIN: { label: "Админ" },
 };
 
@@ -274,3 +276,141 @@ export const CATEGORIES: Record<string, string> = {
   DIGITAL: "Цахим үйлчилгээ",
   OTHER: "Бусад",
 };
+
+/* ═══ Санал, гомдол ══════════════════════════════════════════════
+   Санаачилга  — олон хүнд хамаатай өөрчлөлт. Нийтэд нээлттэй, дэмжлэг
+                 цуглуулж, зөвлөл шийднэ.
+   Санал       — тодорхой нэгжийн үйл ажиллагааг сайжруулах санаа.
+   Гомдол      — үйлчилгээний доголдол, эрх ашиг зөрчигдсөн тохиолдол.
+   Санал, гомдол нь хувийн шинжтэй: илгээгч ба хариуцах нэгжийн хооронд
+   явагдаж, нийтэд зөвхөн нэгжийн нэгдсэн үзүүлэлт харагдана.        */
+
+export type FeedbackKind = "SUGGESTION" | "COMPLAINT";
+
+export const FEEDBACK_KINDS: Record<
+  FeedbackKind,
+  { label: string; prefix: string; days: number; tone: "blue" | "amber"; hint: string; placeholder: string }
+> = {
+  SUGGESTION: {
+    label: "Санал",
+    prefix: "С",
+    days: 15,
+    tone: "blue",
+    hint: "Үйлчилгээ, үйл ажиллагааг сайжруулах санаа. Нэгж судалж, хэрэгжүүлэх эсэхээ бичгээр хариулна.",
+    placeholder:
+      "Одоо ямар байна вэ?\n\nЮуг яаж сайжруулахыг санал болгож байна вэ?\n\nЭнэ нь хэнд, ямар ач холбогдолтой вэ?",
+  },
+  COMPLAINT: {
+    label: "Гомдол",
+    prefix: "Г",
+    days: 10,
+    tone: "amber",
+    hint: "Үйлчилгээний доголдол, журам мөрдөгдөөгүй, эрх ашиг зөрчигдсөн тохиолдол. Нэгж шалгаж, арга хэмжээ авна.",
+    placeholder:
+      "Юу болсон бэ? (хэзээ, хаана)\n\nТанд ямар хохирол, хүндрэл учирсан бэ?\n\nЯмар шийдэл хүлээж байна вэ?",
+  },
+};
+
+export type FeedbackTopic = "ACADEMIC" | "STUDENT" | "FINANCE" | "DIGITAL" | "FACILITY" | "ETHICS";
+
+/** Сэдэв бүр хариуцах нэгжтэй. Илгээгч нэгжийн нэрийг мэдэх шаардлагагүй —
+ *  сэдвээ сонгоход систем автоматаар чиглүүлнэ. */
+export const FEEDBACK_TOPICS: Record<FeedbackTopic, { label: string; unit: string; hint: string }> = {
+  ACADEMIC: {
+    label: "Хичээл, сургалт, дүн",
+    unit: "Сургалтын бодлого, зохицуулалтын алба",
+    hint: "Хичээлийн хуваарь, дүн, шалгалт, хөтөлбөр",
+  },
+  STUDENT: {
+    label: "Оюутны үйлчилгээ, дотуур байр",
+    unit: "Оюутны хөгжлийн алба",
+    hint: "Дотуур байр, клуб, сэтгэл зүйн зөвлөгөө, тодорхойлолт",
+  },
+  FINANCE: {
+    label: "Төлбөр, тэтгэлэг, цалин",
+    unit: "Санхүү, эдийн засгийн алба",
+    hint: "Сургалтын төлбөр, тэтгэлэг, буцаалт, цалин",
+  },
+  DIGITAL: {
+    label: "Цахим систем, интернэт",
+    unit: "Мэдээллийн технологийн төв",
+    hint: "Оюутны систем, Wi-Fi, лабораторийн компьютер, и-мэйл",
+  },
+  FACILITY: {
+    label: "Байр, танхим, орчин",
+    unit: "Аж ахуйн алба",
+    hint: "Анги танхим, халаалт, ариун цэврийн өрөө, цайны газар",
+  },
+  ETHICS: {
+    label: "Ёс зүй, дарамт, шударга бус хандлага",
+    unit: "Ёс зүйн хороо",
+    hint: "Багш, ажилтан, оюутны ёс зүйн зөрчил. Нэрээ нууцлахыг зөвлөж байна.",
+  },
+};
+
+export const FEEDBACK_UNITS: string[] = [
+  ...new Set(Object.values(FEEDBACK_TOPICS).map((t) => t.unit)),
+];
+
+export type FeedbackStatus = "RECEIVED" | "IN_REVIEW" | "ANSWERED" | "CLOSED";
+
+export type FeedbackOutcome = "RESOLVED" | "EXPLAINED" | "TO_INITIATIVE" | "NOT_ACCEPTED";
+
+export const FEEDBACK_OUTCOMES: Record<
+  FeedbackOutcome,
+  { label: string; hint: string; tone: "green" | "blue" | "violet" | "gray" }
+> = {
+  RESOLVED: {
+    label: "Шийдвэрлэсэн",
+    hint: "Асуудлыг зассан, эсвэл саналыг хэрэгжүүлэхээр шийдсэн.",
+    tone: "green",
+  },
+  EXPLAINED: {
+    label: "Тайлбар өгсөн",
+    hint: "Өөрчлөлт хийх шаардлагагүй эсвэл боломжгүй бөгөөд шалтгааныг тайлбарласан.",
+    tone: "blue",
+  },
+  TO_INITIATIVE: {
+    label: "Санаачилга болгохыг зөвлөсөн",
+    hint: "Олон хүнд хамаатай, нэгжийн эрх мэдлээс давсан асуудал. Санаачилга болгож дэмжлэг цуглуулбал зөвлөл хэлэлцэнэ.",
+    tone: "violet",
+  },
+  NOT_ACCEPTED: {
+    label: "Хүлээн авах боломжгүй",
+    hint: "Давхардсан, доромжилсон агуулгатай эсвэл сургуулийн эрх мэдлээс гадуур.",
+    tone: "gray",
+  },
+};
+
+export const FEEDBACK_RATINGS = [
+  { value: 3, label: "Сэтгэл хангалуун" },
+  { value: 2, label: "Хэсэгчлэн хангалуун" },
+  { value: 1, label: "Сэтгэл хангалуун бус" },
+] as const;
+
+export const FEEDBACK_POLICY = {
+  /** Нэгж хүлээн авснаа баталгаажуулах хугацаа (ажлын өдөр). */
+  ACK_DAYS: 2,
+  /** Хариу өгсний дараа илгээгч дахин нээх боломжтой хугацаа (хоног).
+   *  Энэ хугацаанд үйлдэл хийгээгүй бол автоматаар хаагдана. */
+  REOPEN_DAYS: 7,
+  /** Дахин нээгдсэн хүсэлтэд хариулах хугацаа (ажлын өдөр). */
+  REOPEN_RESPONSE_DAYS: 5,
+  /** Нэг хүсэлтийг хэдэн удаа дахин нээж болох вэ. */
+  MAX_REOPEN: 1,
+  /** Нэг хүн өдөрт илгээх дээд тоо — спамаас сэргийлнэ. */
+  DAILY_LIMIT: 5,
+  TITLE_MIN: 10,
+  TITLE_MAX: 120,
+  BODY_MIN: 40,
+  BODY_MAX: 4000,
+  /** Эцсийн хариуны доод урт. «Шийдэгдлээ» гэсэн ганц үг хүлээн авахгүй. */
+  ANSWER_MIN: 80,
+  /** Өөр нэгж рүү шилжүүлэх шалтгааны доод урт. */
+  TRANSFER_REASON_MIN: 20,
+} as const;
+
+/** Бүртгэлийн дугаар: «Г-2026-0012». Илгээгч энэ дугаараар хүсэлтээ лавлана. */
+export function feedbackCode(f: { id: number; kind: FeedbackKind; created_at: string }) {
+  return `${FEEDBACK_KINDS[f.kind].prefix}-${new Date(f.created_at).getFullYear()}-${String(f.id).padStart(4, "0")}`;
+}

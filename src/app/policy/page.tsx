@@ -9,12 +9,19 @@ import {
   COMMENT_REPORT_REASONS,
   type Audience,
   type ScopeKey,
+  FEEDBACK_KINDS,
+  FEEDBACK_TOPICS,
+  FEEDBACK_OUTCOMES,
+  FEEDBACK_POLICY,
+  type FeedbackKind,
+  type FeedbackTopic,
+  type FeedbackOutcome,
 } from "@/lib/policy";
 import { Stars, Notice } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Журам · Оюутны санал санаачилга" };
+export const metadata = { title: "Журам · Санал, санаачилгын цахим платформ" };
 
 export default function PolicyPage() {
   return (
@@ -290,9 +297,118 @@ export default function PolicyPage() {
         </ul>
       </section>
 
+      {/* ── Санал, гомдол ── */}
+      <section id="feedback" className="space-y-4">
+        <h2 className="text-[19px] font-medium">5. Санал, гомдол хүлээн авах журам</h2>
+        <p className="text-[14px] text-ink2">
+          Санаачилга нь олон хүнд хамаатай өөрчлөлтөд нийтийн дэмжлэг цуглуулдаг бол санал,
+          гомдол нь тодорхой асуудлыг{" "}
+          <strong className="font-medium text-ink">хариуцах нэгжид шууд</strong> хүргэдэг
+          хувийн суваг юм. Агуулга нь нийтэд нийтлэгдэхгүй.
+        </p>
+
+        <h3 className="text-[15px] font-medium">5.1 Төрөл ба хариу өгөх хугацаа</h3>
+        <div className="card overflow-x-auto">
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Төрөл</th>
+                <th>Хүлээн авах</th>
+                <th>Хариу өгөх</th>
+                <th>Тайлбар</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(Object.keys(FEEDBACK_KINDS) as FeedbackKind[]).map((k) => (
+                <tr key={k}>
+                  <td className="whitespace-nowrap">{FEEDBACK_KINDS[k].label}</td>
+                  <td className="tabular-nums whitespace-nowrap">{FEEDBACK_POLICY.ACK_DAYS} ажлын өдөр</td>
+                  <td className="tabular-nums whitespace-nowrap">{FEEDBACK_KINDS[k].days} ажлын өдөр</td>
+                  <td className="text-ink2">{FEEDBACK_KINDS[k].hint}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h3 className="text-[15px] font-medium">5.2 Хариуцах нэгж</h3>
+        <p className="text-[14px] text-ink2">
+          Илгээгч нэгжийн нэрийг мэдэх шаардлагагүй — сэдвээ сонгоход систем автоматаар
+          чиглүүлнэ. Буруу нэгжид очсон бол нэгж зөв нэгж рүү шалтгаантайгаар шилжүүлнэ.{" "}
+          <strong className="font-medium text-ink">Шилжүүлэх нь хариу өгөх хугацааг сунгахгүй.</strong>
+        </p>
+        <div className="card overflow-x-auto">
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Сэдэв</th>
+                <th>Хариуцах нэгж</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(Object.keys(FEEDBACK_TOPICS) as FeedbackTopic[]).map((t) => (
+                <tr key={t}>
+                  <td>
+                    {FEEDBACK_TOPICS[t].label}
+                    <div className="text-[12.5px] text-ink3">{FEEDBACK_TOPICS[t].hint}</div>
+                  </td>
+                  <td className="text-ink2">{FEEDBACK_TOPICS[t].unit}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h3 className="text-[15px] font-medium">5.3 Хариу ба үр дүн</h3>
+        <p className="text-[14px] text-ink2">
+          Нэгж эцсийн хариуг дор хаяж{" "}
+          <strong className="font-medium text-ink">{FEEDBACK_POLICY.ANSWER_MIN} тэмдэгтээр</strong>{" "}
+          бичиж, доорх үр дүнгийн аль нэгийг заавал сонгоно.
+        </p>
+        <ul className="text-[14px] text-ink2 space-y-1.5 list-disc pl-5">
+          {(Object.keys(FEEDBACK_OUTCOMES) as FeedbackOutcome[]).map((o) => (
+            <li key={o}>
+              <strong className="font-medium text-ink">{FEEDBACK_OUTCOMES[o].label}</strong> —{" "}
+              {FEEDBACK_OUTCOMES[o].hint}
+            </li>
+          ))}
+        </ul>
+
+        <h3 className="text-[15px] font-medium">5.4 Илгээгчийн эрх</h3>
+        <ul className="text-[14px] text-ink2 space-y-1.5 list-disc pl-5">
+          <li>
+            Нэрээ нууцалж илгээж болно. Энэ тохиолдолд нэр, салбар, курс огт хадгалагдахгүй бөгөөд
+            хариуцах нэгж хэн илгээснийг мэдэхгүй.
+          </li>
+          <li>Нэгжтэй энэ хуудсаар дамжуулан мессеж солилцож, нэмэлт мэдээлэл өгнө.</li>
+          <li>
+            Хариу авснаас хойш {FEEDBACK_POLICY.REOPEN_DAYS} хоногийн дотор хариуг үнэлж хаах,
+            эсвэл хангалтгүй бол {FEEDBACK_POLICY.MAX_REOPEN} удаа дахин нээх эрхтэй. Дахин
+            нээгдсэн хүсэлтэд нэгж {FEEDBACK_POLICY.REOPEN_RESPONSE_DAYS} ажлын өдрийн дотор
+            хариулна. Хугацаанд нь үйлдэл хийгээгүй бол автоматаар хаагдана.
+          </li>
+          <li>
+            Нэгж «санаачилга болгохыг зөвлөсөн» бол, эсвэл санал олон хүнд хамаатай бол
+            илгээгч нэг товчоор санаачилга болгон дэвшүүлж болно.
+          </li>
+          <li>Спамаас сэргийлж нэг хүн 24 цагт {FEEDBACK_POLICY.DAILY_LIMIT} хүртэл хүсэлт илгээнэ.</li>
+        </ul>
+
+        <h3 className="text-[15px] font-medium">5.5 Нэгжийн хариуцлага</h3>
+        <p className="text-[14px] text-ink2">
+          Хүсэлтийн агуулга нууц боловч нэгж бүрийн{" "}
+          <strong className="font-medium text-ink">
+            хүлээн авсан тоо, хугацаандаа хариулсан хувь, дундаж хугацаа, сэтгэл ханамж, хоцорсон
+            хүсэлтийн тоо
+          </strong>{" "}
+          «Санал, гомдол» хуудсанд нийтэд ил харагдана. Нэгжийн дотоод тэмдэглэл илгээгчид
+          харагдахгүй ч аудит логт бүх үйлдэл бүртгэгдэнэ.
+        </p>
+      </section>
+
       {/* ── Нууцлал ── */}
       <section id="privacy" className="space-y-4">
-        <h2 className="text-[19px] font-medium">5. Нууцлалын бодлого</h2>
+        <h2 className="text-[19px] font-medium">6. Нууцлалын бодлого</h2>
         <div className="card overflow-x-auto">
           <table className="data">
             <thead>
@@ -323,6 +439,20 @@ export default function PolicyPage() {
                 <td className="text-ink2">Нэр, бүлэг, салбар (курс эсвэл албан тушаал)-тай хамт нийтэд харагдана.</td>
               </tr>
               <tr>
+                <td>Санал, гомдлын агуулга</td>
+                <td className="text-ink2">
+                  Зөвхөн та, хариуцах нэгжийн хариуцагч, системийн админ. Нийтэд зөвхөн нэгжийн
+                  нэгдсэн тоон үзүүлэлт харагдана.
+                </td>
+              </tr>
+              <tr>
+                <td>Нэрээ нууцалсан санал, гомдлын илгээгч</td>
+                <td className="text-ink2">
+                  Хэн ч харахгүй — нэр, харьяалал хадгалагдахгүй. Хариуг танд хүргэхийн тулд
+                  зөвхөн бүртгэлийн холбоос хадгалагдана.
+                </td>
+              </tr>
+              <tr>
                 <td>Оюутны код, ажилтны дугаар, и-мэйл</td>
                 <td className="text-ink2">Нийтэд хэзээ ч харагдахгүй. Зөвхөн нэвтрэлтэд ашиглана.</td>
               </tr>
@@ -342,7 +472,7 @@ export default function PolicyPage() {
 
       {/* ── Гомдол ── */}
       <section id="appeal" className="space-y-4">
-        <h2 className="text-[19px] font-medium">6. Гомдол гаргах журам</h2>
+        <h2 className="text-[19px] font-medium">7. Шийдвэрийг давж заалдах журам</h2>
         <ol className="text-[14px] text-ink2 space-y-1.5 list-decimal pl-5">
           <li>
             Модераторын буцаасан шийдвэрийг эс зөвшөөрвөл 14 хоногийн дотор Оюутны холбооны
@@ -361,7 +491,7 @@ export default function PolicyPage() {
 
       {/* ── Хориотой ── */}
       <section id="terms" className="space-y-4">
-        <h2 className="text-[19px] font-medium">7. Үйлчилгээний нөхцөл</h2>
+        <h2 className="text-[19px] font-medium">8. Үйлчилгээний нөхцөл</h2>
         <ul className="text-[14px] text-ink2 space-y-1.5 list-disc pl-5">
           <li>Системд зөвхөн сургуулийн бүртгэлтэй, идэвхтэй оюутан, багш, ажилтан нэвтэрнэ.</li>
           <li>

@@ -15,6 +15,7 @@ const db = new DatabaseSync(dbPath);
 // Ингэснээр сервер ажиллаж байхад ч `npm run seed` ажиллана.
 db.exec("PRAGMA foreign_keys = OFF");
 for (const t of [
+  "feedback_events", "feedback",
   "audit_log", "progress_updates", "council_decisions", "comment_reports",
   "comments", "votes", "endorsements", "initiatives", "sessions",
   "otp_codes", "users",
@@ -150,6 +151,13 @@ const OFFICERS = [
   ["C00002", "STAFF", UNITS[0].name, "Албаны дарга", 0, "COUNCIL"],
   ["C00003", "STAFF", UNITS[1].name, "Албаны дарга", 0, "COUNCIL"],
   ["S00001", "STAFF", UNITS[3].name, "Төвийн дарга", 0, "ADMIN"],
+  // Нэгжийн хариуцагчид — өөрийн нэгжид ирсэн санал, гомдлыг шийдвэрлэнэ.
+  ["H00001", "STAFF", UNITS[0].name, "Ахлах мэргэжилтэн", 0, "HANDLER"],
+  ["H00002", "STAFF", UNITS[2].name, "Мэргэжилтэн", 0, "HANDLER"],
+  ["H00003", "STAFF", UNITS[1].name, "Эдийн засагч", 0, "HANDLER"],
+  ["H00004", "STAFF", UNITS[3].name, "Системийн инженер", 0, "HANDLER"],
+  ["H00005", "STAFF", UNITS[4].name, "Ахлах ажилтан", 0, "HANDLER"],
+  ["H00006", "STAFF", "Ёс зүйн хороо", "Хорооны нарийн бичгийн дарга", 0, "HANDLER"],
 ];
 const officer = {};
 for (const [code, group, division, position, year, role] of OFFICERS) {
@@ -707,8 +715,424 @@ const MHTS = SCHOOLS[0].name;
 - Тодорхой хүний нэр дурдахгүйгээр, хичээлийн агуулга, дүгнэх журмын өөрчлөлтийг шаардах
 - Багшийн үнэлгээний тогтолцоог сайжруулах ерөнхий санал дэвшүүлэх
 
-Тодорхой багштай холбоотой гомдлыг Сургалтын албаны гомдол барагдуулах журмын дагуу шууд гаргана уу.`,
+Тодорхой багштай холбоотой асуудлыг «Санал, гомдол» хэсгээр «Ёс зүй» сэдвийг сонгон, нэрээ нууцлан Ёс зүйн хороонд шууд илгээнэ үү. Тэнд таны нэр хэнд ч харагдахгүй.`,
   });
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   САНАЛ, ГОМДОЛ
+   Нэгж → хариуцагч. Нэр нь src/lib/policy.ts доторх FEEDBACK_TOPICS-тэй
+   яг ижил байх ёстой.
+   ══════════════════════════════════════════════════════════════════ */
+
+const FB_UNIT = {
+  ACADEMIC: UNITS[0].name,
+  STUDENT: UNITS[2].name,
+  FINANCE: UNITS[1].name,
+  DIGITAL: UNITS[3].name,
+  FACILITY: UNITS[4].name,
+  ETHICS: "Ёс зүйн хороо",
+};
+const FB_HANDLER = {
+  [UNITS[0].name]: officer.H00001,
+  [UNITS[2].name]: officer.H00002,
+  [UNITS[1].name]: officer.H00003,
+  [UNITS[3].name]: officer.H00004,
+  [UNITS[4].name]: officer.H00005,
+  "Ёс зүйн хороо": officer.H00006,
+};
+const FB_DAYS = { SUGGESTION: 15, COMPLAINT: 10 };
+const ACK_DAYS = 2;
+
+const insFb = db.prepare(`INSERT INTO feedback
+ (kind,topic,unit,title,body,author_id,author_name,author_meta,author_group,anonymous,status,outcome,
+  handler_id,handler_name,created_at,ack_due,due_at,acknowledged_at,answered_at,closed_at,rating,
+  reopen_count,initiative_id)
+ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+const insFbEv = db.prepare(`INSERT INTO feedback_events
+ (feedback_id,kind,actor,actor_name,body,internal,created_at) VALUES (?,?,?,?,?,?,?)`);
+
+/** src/lib/format.ts доторх addWorkingDays()-тэй ижил. */
+function workingDays(ms, n) {
+  const d = new Date(ms);
+  let left = n;
+  while (left > 0) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) left--;
+  }
+  return d.getTime();
+}
+
+const metaOf = (p) =>
+  p.group === "STUDENT"
+    ? `${shortDivision(p.division)} · ${p.year}-р курс`
+    : `${shortDivision(p.division)} · ${p.position.split(" · ").pop()}`;
+
+let fbId = 0;
+
+/**
+ * o.events: [[kind, actor, body, atMs, internal?]] — atMs нь үнэмлэхүй хугацаа.
+ * actor: "A" (илгээгч) | "H" (хариуцагч) | "S" (систем)
+ */
+function fb(o) {
+  fbId++;
+  const unit = o.unit ?? FB_UNIT[o.topic];
+  const handler = o.handler === undefined ? FB_HANDLER[unit] : o.handler;
+  const anon = o.anonymous ? 1 : 0;
+  insFb.run(
+    o.kind, o.topic, unit, o.title, o.body,
+    o.author.id, anon ? "" : o.author.name, anon ? "" : metaOf(o.author), o.author.group, anon,
+    o.status, o.outcome ?? null,
+    o.acked ? handler.id : null, o.acked ? handler.name : "",
+    iso(o.created), iso(o.ackDue ?? workingDays(o.created, ACK_DAYS)),
+    iso(o.due ?? workingDays(o.created, FB_DAYS[o.kind])),
+    o.acked ? iso(o.acked) : null, o.answered ? iso(o.answered) : null,
+    o.closed ? iso(o.closed) : null, o.rating ?? null, o.reopen ?? 0, o.initiative ?? null
+  );
+  insFbEv.run(fbId, "SUBMITTED", "AUTHOR", anon ? "" : o.author.name, "", 0, iso(o.created));
+  for (const [kind, actor, body, at, internal] of o.events ?? []) {
+    const who =
+      actor === "A" ? (anon ? "" : o.author.name) : actor === "H" ? handler.name : "систем";
+    insFbEv.run(
+      fbId, kind, actor === "A" ? "AUTHOR" : actor === "H" ? "HANDLER" : "SYSTEM",
+      who, body, internal ? 1 : 0, iso(at)
+    );
+  }
+  return fbId;
+}
+
+const ACCEPT = (unit) => `${unit} хүлээн авч, шийдвэрлэж эхлэв.`;
+
+/* ── А. Хариу өгсөн · үнэлгээ хүлээж буй · демо оюутан ─────────── */
+{
+  const me = people.STUDENT[0];
+  const created = now - days(9);
+  const unit = FB_UNIT.DIGITAL;
+  fb({
+    kind: "COMPLAINT", topic: "DIGITAL", author: me, created,
+    title: "3-р байрны 4 давхарт Wi-Fi өдөр бүр тасалддаг",
+    body: `3-р байрны 4 давхрын 402, 405 тоот анги танхимд өдөр бүр 11:00-14:00 цагийн хооронд Wi-Fi холболт 10-15 минут тутам тасарч байна. Энэ нь онлайн тест өгөх, Moodle-оос материал татахад саад болж байна.
+
+Долоо хоног гаруй үргэлжилж байгаа бөгөөд ангийн бусад оюутнууд ч адилхан асуудалтай байна.`,
+    status: "ANSWERED", outcome: "RESOLVED",
+    acked: created + hours(5), answered: now - days(2),
+    events: [
+      ["ACCEPTED", "H", ACCEPT(unit), created + hours(5)],
+      ["MESSAGE", "H", "Сайн байна уу. Асуудлыг шалгахын тулд утас эсвэл зөөврийн компьютер аль нь тасарч байгааг, мөн сүлжээний нэрийг (MUST-Student эсвэл MUST-Guest) тодруулж өгнө үү.", created + days(1)],
+      ["MESSAGE", "A", "Зөөврийн компьютер, утас хоёулаа тасарч байна. MUST-Student сүлжээ.", created + days(1) + hours(3)],
+      ["NOTE", "H", "AP-3-4-02 төхөөрөмжийн программ хангамж хуучирсан, үдийн цагаар 80+ холболттой болж хэт ачаалалтай байна. Шинэчлэх + нэмэлт AP суурилуулах.", created + days(2), true],
+      ["ANSWER", "H", `Шалгалтаар 4 давхрын утасгүй сүлжээний цэг (access point) хэт ачаалалтай, программ хангамж нь хуучирсан байсныг тогтоов.
+
+Авсан арга хэмжээ:
+1. Төхөөрөмжийн программ хангамжийг шинэчилсэн.
+2. 404 тоотын хажууд нэмэлт цэг суурилуулж, ачааллыг хуваарилсан.
+
+Одоогийн хэмжилтээр үдийн цагаар тасалдал гараагүй байна. Хэрэв дахин давтагдвал энэ хүсэлтийг дахин нээнэ үү.`, now - days(2)],
+    ],
+  });
+}
+
+/* ── Б. Шийдвэрлэж буй санал · демо оюутан ─────────────────────── */
+{
+  const me = people.STUDENT[0];
+  const created = now - days(4);
+  fb({
+    kind: "SUGGESTION", topic: "ACADEMIC", author: me, created,
+    title: "Хичээлийн хуваарийг утасны календарьт экспортлох боломж нэмэх",
+    body: `Оюутны системд хичээлийн хуваарь зөвхөн хүснэгт хэлбэрээр харагддаг. Улирал бүр гараар утасны календарьт оруулах шаардлагатай болдог бөгөөд өрөө солигдоход мэдэхгүй өнгөрөх тохиолдол гардаг.
+
+Санал: хуваарийг .ics файлаар татах эсвэл Google Calendar-т холбох линк гаргах. Өрөө, цаг өөрчлөгдвөл календарь автоматаар шинэчлэгдэнэ.`,
+    status: "IN_REVIEW", acked: created + hours(20),
+    events: [
+      ["ACCEPTED", "H", ACCEPT(FB_UNIT.ACADEMIC), created + hours(20)],
+      ["NOTE", "H", "МТ төвөөс оюутны системийн API-д хуваарь гаргах боломж байгаа эсэхийг лавласан.", created + days(1), true],
+      ["MESSAGE", "H", "Саналыг хүлээн авлаа. Техникийн боломжийг Мэдээллийн технологийн төвтэй хамтран судалж байна. Хугацаандаа хариу өгнө.", created + days(2)],
+    ],
+  });
+}
+
+/* ── В. Санаачилга болгохыг зөвлөсөн · демо оюутан ────────────── */
+{
+  const me = people.STUDENT[0];
+  const created = now - days(12);
+  const unit = FB_UNIT.STUDENT;
+  fb({
+    kind: "SUGGESTION", topic: "STUDENT", author: me, created,
+    title: "Дотуур байрны орох цагийг 23:00-аас 24:00 болгох",
+    body: `Оройн ээлжийн хичээл 21:40-д тарж, номын сан 22:00-д хаагддаг. Хотын төвөөс дотуур байр хүртэл нийтийн тээврээр 40-50 минут явдаг тул 23:00 цагийн дүрмийг зөрчихөөс өөр аргагүй болж, сануулга авах явдал гардаг.
+
+Санал: дотуур байрны орох цагийг 24:00 болгох, эсвэл оюутны картаар бүртгүүлж орох боломж олгох.`,
+    status: "ANSWERED", outcome: "TO_INITIATIVE",
+    acked: created + days(1), answered: now - days(1),
+    events: [
+      ["ACCEPTED", "H", ACCEPT(unit), created + days(1)],
+      ["MESSAGE", "H", "Оройн ээлжийн хичээлтэй хэдэн оюутан тантай адил байдалд байгааг мэдэх үү? Судалгаанд хэрэгтэй байна.", created + days(3)],
+      ["MESSAGE", "A", "Манай курсээс л гэхэд 30 гаруй оюутан оройн ээлжтэй. Бусад сургуулийнхан ч мөн адил.", created + days(3) + hours(6)],
+      ["ANSWER", "H", `Таны саналыг судаллаа. Дотуур байрны дотоод журмын өөрчлөлт нь дотуур байрны бүх оюутан (1,200 орчим), харуул хамгаалалтын ээлж, санхүүжилтэд нөлөөлөх тул Оюутны хөгжлийн алба дангаараа шийдвэрлэх эрхгүй.
+
+Энэ асуудал олон оюутанд хамаатай тул санаачилга болгож дэмжлэг цуглуулахыг зөвлөж байна. Босго давбал сургуулийн зөвлөл заавал хэлэлцэх бөгөөд манай алба хэрэгжүүлэх төлөвлөгөө, зардлын тооцоог зөвлөлд танилцуулахад бэлэн.`, now - days(1)],
+    ],
+  });
+}
+
+/* ── Г. Санаачилга болсон түүх — 1-р санаачилгатай холбоотой ──── */
+{
+  const author = S(12);
+  const created = now - days(26);
+  const unit = FB_UNIT.FACILITY;
+  fb({
+    kind: "SUGGESTION", topic: "FACILITY", author, created,
+    title: "Шалгалтын долоо хоногт номын санг шөнө ажиллуулах",
+    body: `Улирлын шалгалтын үеэр номын сан 22:00-д хаагддаг тул оюутнууд бэлтгэх тайван орчингүй болдог. Шалгалтын 2 долоо хоногт уншлагын танхимыг шөнөжин нээж болох уу?`,
+    status: "CLOSED", outcome: "TO_INITIATIVE",
+    acked: created + hours(8), answered: created + days(4), closed: now - days(14), rating: 3,
+    initiative: 1,
+    events: [
+      ["ACCEPTED", "H", ACCEPT(unit), created + hours(8)],
+      ["ANSWER", "H", `Уншлагын танхимыг шөнө ажиллуулахад харуулын нэмэлт ээлж, халаалт, гэрэлтүүлгийн зардал гарах бөгөөд энэ нь алба дангаараа батлах боломжгүй санхүүгийн шийдвэр юм.
+
+Олон оюутанд хамаатай тул санаачилга болгож дэмжлэг цуглуулахыг зөвлөж байна. Зөвлөлөөр батлагдвал аж ахуйн талын бэлтгэлийг манай алба хангана.`, created + days(4)],
+      ["INITIATIVE", "A", "«Шалгалтын долоо хоногт номын санг 24 цаг ажиллуулах»", now - days(14)],
+      ["CLOSED", "A", "Зөвлөгөө өгсөнд баярлалаа. Санаачилга болгож дэвшүүллээ.", now - days(14)],
+    ],
+  });
+}
+
+/* ── Д. Нэрээ нууцалсан ёс зүйн гомдол ────────────────────────── */
+{
+  const author = S(260);
+  const created = now - days(3);
+  const unit = FB_UNIT.ETHICS;
+  fb({
+    kind: "COMPLAINT", topic: "ETHICS", author, created, anonymous: true,
+    title: "Хичээлийн үеэр багш оюутнуудыг доромжилсон үг хэллэг хэрэглэдэг",
+    body: `Нэгэн мэргэжлийн хичээлийн лекцийн үеэр багш асуулт асуусан оюутнуудыг бусдын өмнө «ойлгодоггүй», «энд сурах хэрэггүй» гэх мэтээр удаа дараа доромжилдог. Үүнээс болж оюутнууд асуулт асуухаас айдаг болсон.
+
+Санаачилга хэлбэрээр илгээхэд хувь хүн рүү чиглэсэн гэж буцаагдсан тул энэ сувгаар илгээж байна. Нэрээ нууцалж байгаа шалтгаан нь дүнгээр дарамтлуулахаас айж байна.`,
+    status: "IN_REVIEW", acked: created + days(1),
+    events: [
+      ["ACCEPTED", "H", ACCEPT(unit), created + days(1)],
+      ["NOTE", "H", "Хичээлийн кодыг тодруулсны дараа тухайн ангийн оюутнуудаас нэрээ нууцалсан богино судалгаа авахаар төлөвлөв. Багшид судалгаа дуусахаас өмнө мэдэгдэхгүй.", created + days(1) + hours(2), true],
+      ["MESSAGE", "H", "Гомдлыг хүлээн авлаа. Шалгахын тулд хичээлийн нэр эсвэл кодыг бичиж өгнө үү. Таны нэр хорооны гишүүдэд ч харагдахгүй бөгөөд тухайн багшид хэзээ ч мэдэгдэхгүй.", created + days(1) + hours(3)],
+      ["MESSAGE", "A", "Мэдээллийн системийн тэнхимийн 3-р курсын лекц. Мягмар гарагийн 2-р цаг.", created + days(2)],
+    ],
+  });
+}
+
+/* ── Е. Хаагдсан · сэтгэл хангалуун · багш ─────────────────────── */
+{
+  const author = T(15);
+  const created = now - days(30);
+  const unit = FB_UNIT.FACILITY;
+  fb({
+    kind: "COMPLAINT", topic: "FACILITY", author, created,
+    title: "Б корпусын 2-р давхрын ариун цэврийн өрөө 2 долоо хоног эвдэрхий",
+    body: `Б корпусын 2-р давхрын ариун цэврийн өрөөний усны хоолой гоожиж, хаалгыг нь цоожилсон байдлаар 2 долоо хоног болж байна. Тухайн давхарт 6 анги танхим, 2 тэнхим байрладаг тул завсарлагаанд бусад давхарт дараалал үүсч, хичээл хоцорч эхлэх болсон.`,
+    status: "CLOSED", outcome: "RESOLVED",
+    acked: created + hours(3), answered: created + days(3), closed: created + days(4), rating: 3,
+    events: [
+      ["ACCEPTED", "H", ACCEPT(unit), created + hours(3)],
+      ["ANSWER", "H", "Сантехникийн засвар хийгдэж, гоожиж байсан хоолойг бүрэн сольсон. Ариун цэврийн өрөө өнөөдрөөс хэвийн ашиглагдаж байна. Цаашид давхар бүрийн ариун цэврийн өрөөг долоо хоног бүр шалгах хуваарь гаргалаа.", created + days(3)],
+      ["CLOSED", "A", "Шуурхай засуулсанд баярлалаа.", created + days(4)],
+    ],
+  });
+}
+
+/* ── Ж. Хүлээн аваагүй · хугацаа хэтэрсэн ─────────────────────── */
+{
+  const author = S(77);
+  const created = now - days(18);
+  fb({
+    kind: "COMPLAINT", topic: "FINANCE", author, created,
+    title: "Сурлагын тэтгэлэг 2 сар дараалан олгогдоогүй",
+    body: `Өмнөх улиралд 3.6 голч дүнтэй суралцаж, сурлагын тэтгэлэгт хамрагдах шийдвэр гарсан. Гэвч 9, 10-р сарын тэтгэлэг дансанд орж ирээгүй. Санхүүгийн албанд 2 удаа биечлэн очиход «шалгаж байна» гэсэн хариу авсан.
+
+Тэтгэлэг хэзээ олгогдох, хоцорсон шалтгааныг бичгээр мэдэгдэхийг хүсэж байна.`,
+    status: "RECEIVED", handler: null,
+  });
+}
+
+/* ── З. Буруу нэгжид очоод шилжүүлсэн ────────────────────────── */
+{
+  const author = S(150);
+  const created = now - days(6);
+  const from = FB_UNIT.FACILITY;
+  const to = FB_UNIT.DIGITAL;
+  const moved = now - days(1);
+  fb({
+    kind: "COMPLAINT", topic: "FACILITY", unit: to, author, created,
+    title: "305 тоот лабораторийн 12 компьютер асахгүй байна",
+    body: `3-р байрны 305 тоот компьютерийн лабораторийн 24 компьютерын 12 нь асахгүй байгаа тул лабораторийн хичээлд 2 оюутан нэг компьютер хуваан ашиглаж байна. Энэ нь бие даалтын ажил хийхэд хүндрэл учруулж байна.`,
+    status: "RECEIVED", handler: null,
+    ackDue: workingDays(moved, ACK_DAYS),
+    events: [
+      ["TRANSFERRED", "S", `${from} → ${to}\n\nКомпьютерийн техник хангамжийн засвар Мэдээллийн технологийн төвийн хариуцлагад хамаарна. Цахилгааны асуудал илэрвэл манай алба хамтран ажиллана.`, moved],
+    ],
+  });
+  // Шилжүүлсэн хүн нь Аж ахуйн албаны хариуцагч.
+  db.prepare(`UPDATE feedback_events SET actor='HANDLER', actor_name=? WHERE feedback_id=? AND kind='TRANSFERRED'`)
+    .run(officer.H00005.name, fbId);
+}
+
+/* ── И. Тайлбар өгсөн · хэсэгчлэн хангалуун · ажилтан ─────────── */
+{
+  const author = A(5);
+  const created = now - days(40);
+  const unit = FB_UNIT.DIGITAL;
+  fb({
+    kind: "SUGGESTION", topic: "DIGITAL", author, created,
+    title: "Цалингийн хуудсыг сар бүр и-мэйлээр автоматаар илгээх",
+    body: `Цалингийн хуудсыг авахын тулд нягтлан бодогчоос хүсэх шаардлагатай болдог. Сар бүр цалин буухад цалингийн хуудас ажилтны сургуулийн и-мэйл рүү PDF хэлбэрээр автоматаар ирдэг болгох санал гаргаж байна.`,
+    status: "CLOSED", outcome: "EXPLAINED",
+    acked: created + days(1), answered: created + days(12), closed: created + days(15), rating: 2,
+    events: [
+      ["ACCEPTED", "H", ACCEPT(unit), created + days(1)],
+      ["ANSWER", "H", `Саналыг судлахад цалингийн мэдээлэл нь «Хүний хувийн мэдээлэл хамгаалах тухай» хуулиар хамгаалагдах мэдээлэл тул шифрлээгүй и-мэйлээр илгээх нь эрсдэлтэй гэж хуулийн алба дүгнэсэн.
+
+Иймд и-мэйлээр илгээхгүй, харин 2027 оны 1-р улиралд нэвтрэх ажилтны хувийн кабинетад цалингийн хуудсыг нэвтэрч үзэх боломжтой байхаар хөгжүүлэлтийн төлөвлөгөөнд тусгалаа.`, created + days(12)],
+      ["CLOSED", "A", "Ойлголоо, гэхдээ хугацаа нь хэт урт юм.", created + days(15)],
+    ],
+  });
+}
+
+/* ── К. Дахин нээгдсэн гомдол ─────────────────────────────────── */
+{
+  const author = S(333);
+  const created = now - days(10);
+  const unit = FB_UNIT.STUDENT;
+  const reopened = now - days(3);
+  fb({
+    kind: "COMPLAINT", topic: "STUDENT", author, created,
+    title: "Дотуур байрны 3-р давхарт халуун ус 5 хоног ирээгүй",
+    body: `2-р дотуур байрны 3-р давхрын угаалгын өрөөнд 5 хоног дараалан халуун ус ирээгүй. Жижүүрт хэлэхэд «засвар хийгдэнэ» гэсэн боловч өөрчлөлт гараагүй.`,
+    status: "IN_REVIEW", outcome: "RESOLVED", reopen: 1,
+    acked: created + hours(6), answered: created + days(3),
+    due: workingDays(reopened, 5),
+    events: [
+      ["ACCEPTED", "H", ACCEPT(unit), created + hours(6)],
+      ["ANSWER", "H", "Халуун усны даралт тохируулагч эвдэрсэн байсныг сольж, 3-р давхарт халуун ус хэвийн болсон. Хүлээлгэсэнд уучлал хүсье.", created + days(3)],
+      ["REOPENED", "A", "Засвар хийснээс хойш 3 хоногийн дараа дахиад халуун ус тасарсан. Өглөө 7-9 цагт огт ирэхгүй байна. Бүрэн шийдэгдээгүй.", reopened],
+      ["NOTE", "H", "Аж ахуйн албатай хамтран бойлерийн хүчин чадлыг шалгуулахаар хүсэлт илгээв.", reopened + hours(20), true],
+    ],
+  });
+}
+
+/* ── Л. Шинээр ирсэн санал · багш ─────────────────────────────── */
+{
+  fb({
+    kind: "SUGGESTION", topic: "FACILITY", author: T(40), created: now - hours(3),
+    title: "Багш нарын өрөөнд проектор, том дэлгэц байрлуулах",
+    body: `Тэнхимийн хурал, аспирантуудын илтгэлийн бэлтгэлийг багш нарын өрөөнд хийдэг ч проектор, дэлгэц байхгүй тул ноутбукийн жижиг дэлгэцийн өмнө 8-10 хүн бөөгнөрдөг. Ханын дэлгэц эсвэл зөөврийн проектор нэг ширхэгийг байрлуулахыг санал болгож байна.`,
+    status: "RECEIVED", handler: null,
+  });
+}
+
+/* ── М. Хүлээн авах боломжгүй · автоматаар хаагдсан ───────────── */
+{
+  const author = S(500);
+  const created = now - days(35);
+  const unit = FB_UNIT.ACADEMIC;
+  fb({
+    kind: "COMPLAINT", topic: "ACADEMIC", author, created,
+    title: "Шалгалтын дүнг ахиулж өгөхийг хүсье",
+    body: `Эцсийн шалгалтад 58 оноо авсан. Тэтгэлэгт хамрагдахад 60 оноо хэрэгтэй тул 2 оноо нэмж өгөхийг хүсэж байна.`,
+    status: "CLOSED", outcome: "NOT_ACCEPTED",
+    acked: created + days(1), answered: created + days(2), closed: created + days(9),
+    events: [
+      ["ACCEPTED", "H", ACCEPT(unit), created + days(1)],
+      ["ANSWER", "H", `Дүнг хүсэлтээр өөрчлөх боломжгүй тул хүлээн авах боломжгүй.
+
+Хэрэв шалгалтын дүгнэлт шударга бус гэж үзэж байгаа бол дүн гарснаас хойш 5 ажлын өдрийн дотор тэнхимд «дүнг дахин хянуулах хүсэлт» гаргах эрхтэй. Тэнхимийн комисс шалгалтын материалыг дахин хянаж шийдвэрлэнэ.`, created + days(2)],
+      ["AUTO_CLOSED", "S", "Хариу өгснөөс хойш 7 хоногт дахин нээгээгүй тул автоматаар хаагдав.", created + days(9)],
+    ],
+  });
+}
+
+/* ── Түүхэн өгөгдөл: нэгж бүрийн үзүүлэлт бодитой харагдахын тулд ── */
+{
+  // [дундаж хариу өгөх хоног, тархалт] — Санхүүгийн алба удаан байгааг харуулна.
+  const SPEED = {
+    ACADEMIC: [8, 7], STUDENT: [5, 4], FINANCE: [22, 10], DIGITAL: [4, 4], FACILITY: [11, 9], ETHICS: [12, 6],
+  };
+  const COUNT = { ACADEMIC: 9, STUDENT: 8, FINANCE: 7, DIGITAL: 10, FACILITY: 9, ETHICS: 3 };
+  const TITLES = {
+    ACADEMIC: [
+      ["COMPLAINT", "Хичээлийн хуваарь давхцсан тул хоёр хичээлд зэрэг сууж чадахгүй байна"],
+      ["SUGGESTION", "Сонгон хичээлийн жагсаалтыг бүртгэл эхлэхээс 2 долоо хоногийн өмнө зарлах"],
+      ["COMPLAINT", "Дүн системд 3 долоо хоног ороогүй"],
+      ["SUGGESTION", "Лекцийн бичлэгийг Moodle-д байршуулдаг болгох"],
+    ],
+    STUDENT: [
+      ["COMPLAINT", "Дотуур байрны өрөөний цонх хаагдахгүй, хүйтэн байна"],
+      ["SUGGESTION", "Клубын үйл ажиллагаанд зориулсан өрөөг цахимаар захиалах"],
+      ["COMPLAINT", "Оюутны тодорхойлолт авахад 3 хоног хүлээлгэдэг"],
+      ["SUGGESTION", "Сэтгэл зүйчтэй уулзах цагийг цахимаар захиалах"],
+    ],
+    FINANCE: [
+      ["COMPLAINT", "Төлбөрийн буцаалт 2 сар болж байхад орж ирээгүй"],
+      ["COMPLAINT", "Төлбөр төлсөн ч системд өртэй гэж харагдсаар байна"],
+      ["SUGGESTION", "Сургалтын төлбөрийг хэсэгчлэн төлөх боломж олгох"],
+      ["COMPLAINT", "Илүү цагийн хөлс тооцоогүй"],
+    ],
+    DIGITAL: [
+      ["COMPLAINT", "Оюутны системд нэвтрэхэд алдаа гардаг"],
+      ["COMPLAINT", "Сургуулийн и-мэйлийн нууц үг сэргээх боломжгүй"],
+      ["SUGGESTION", "Номын сангийн каталогийг утаснаас хайх боломжтой болгох"],
+      ["COMPLAINT", "Лабораторийн принтер ажиллахгүй"],
+    ],
+    FACILITY: [
+      ["COMPLAINT", "Анги танхимын халаалт хангалтгүй"],
+      ["SUGGESTION", "Хичээлийн байрны орцонд дугуйн зогсоол байрлуулах"],
+      ["COMPLAINT", "Цайны газрын хоолны үнэ сэрэмжлүүлэггүй нэмэгдсэн"],
+      ["COMPLAINT", "Лифт 1 долоо хоног ажиллахгүй байна"],
+    ],
+    ETHICS: [
+      ["COMPLAINT", "Шалгалтын үеэр хуулсан гэх үндэслэлгүй буруутгал"],
+      ["COMPLAINT", "Ажлын байранд дарамт үзүүлсэн"],
+    ],
+  };
+  const ANSWERS = {
+    RESOLVED: "Асуудлыг шалгаж, шаардлагатай арга хэмжээг авч шийдвэрлэлээ. Дахин давтагдвал мэдэгдэнэ үү.",
+    EXPLAINED: "Асуудлыг судаллаа. Одоогийн журам, нөөцийн хүрээнд өөрчлөлт хийх боломжгүй бөгөөд шалтгааныг дэлгэрэнгүй тайлбарлав.",
+  };
+  const pool = [...people.STUDENT, ...people.STUDENT, ...people.TEACHER, ...people.STAFF];
+
+  for (const topic of Object.keys(COUNT)) {
+    const unit = FB_UNIT[topic];
+    const [avg, spread] = SPEED[topic];
+    for (let i = 0; i < COUNT[topic]; i++) {
+      const [kind, title] = TITLES[topic][i % TITLES[topic].length];
+      const author = pool[Math.floor(rnd() * pool.length)];
+      const created = now - days(45 + Math.floor(rnd() * 250)) - hours(Math.floor(rnd() * 10));
+      const respDays = Math.max(1, Math.round(avg + (rnd() - 0.5) * 2 * spread));
+      const answered = created + days(respDays) + hours(Math.floor(rnd() * 8));
+      const due = workingDays(created, FB_DAYS[kind]);
+      const onTime = answered <= due;
+      const outcome = rnd() < 0.72 ? "RESOLVED" : "EXPLAINED";
+      // Хугацаандаа, шийдвэрлэсэн бол сэтгэл ханамж өндөр.
+      const r = rnd();
+      const rating =
+        r < 0.22 ? null
+        : outcome === "RESOLVED" && onTime ? (r < 0.85 ? 3 : 2)
+        : onTime ? (r < 0.55 ? 3 : 2)
+        : r < 0.45 ? 2 : 1;
+      const closed = answered + days(rating ? 1 + Math.floor(rnd() * 4) : 7);
+      fb({
+        kind, topic, author, created, title,
+        anonymous: topic === "ETHICS" || rnd() < 0.12,
+        body: `${title}. Дэлгэрэнгүй мэдээллийг хавсаргав. Шуурхай шийдвэрлэж өгөхийг хүсье.`,
+        status: "CLOSED", outcome,
+        acked: created + hours(2 + Math.floor(rnd() * 30)), answered, closed, rating,
+        events: [
+          ["ACCEPTED", "H", ACCEPT(unit), created + hours(4)],
+          ["ANSWER", "H", ANSWERS[outcome], answered],
+          rating
+            ? ["CLOSED", "A", "", closed]
+            : ["AUTO_CLOSED", "S", "Хариу өгснөөс хойш 7 хоногт дахин нээгээгүй тул автоматаар хаагдав.", closed],
+        ],
+      });
+    }
+  }
 }
 
 insAudit.run("систем", "SEED", "database", null, "Демо өгөгдөл үүсгэв.", iso(now));
@@ -718,6 +1142,7 @@ const byGroup = db.prepare(`SELECT group_key, COUNT(*) n FROM users GROUP BY gro
 console.log(`Өгөгдлийн сан бэлэн: ${dbPath}`);
 console.log(`  ${byGroup.map((r) => `${r.group_key} ${r.n}`).join(" · ")}`);
 console.log(`  санаачилга ${cnt("initiatives")} · санал ${cnt("votes")} · сэтгэгдэл ${cnt("comments")}`);
+console.log(`  санал, гомдол ${cnt("feedback")} · харилцааны бичлэг ${cnt("feedback_events")}`);
 console.log("");
 console.log("  Нэвтрэх демо код:");
 // Нэвтрэх хуудас бүлэг тус бүрийн эхний энгийн гишүүнийг харуулдаг — түүнтэй ижил.
@@ -727,3 +1152,5 @@ console.log(`   ${people.STAFF[0].code}   — ажилтан`);
 console.log("   M00001  — оюутан + модератор");
 console.log("   C00001  — багш + зөвлөлийн гишүүн");
 console.log("   S00001  — ажилтан + админ");
+console.log("   H00004  — МТ төвийн хариуцагч (санал, гомдол)");
+console.log("   H00006  — Ёс зүйн хорооны хариуцагч (нэрээ нууцалсан гомдол)");

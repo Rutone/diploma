@@ -7,6 +7,7 @@ import { Empty, Notice, StatusBadge } from "@/components/ui";
 import { fmtDateTime, relative, remaining } from "@/lib/format";
 import { POLICY } from "@/lib/policy";
 import { addDays } from "@/lib/format";
+import { feedbackTotals } from "@/lib/feedback";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export default async function AdminPage() {
 
   const queue = moderationQueue();
   const s = stats();
+  const fb = feedbackTotals();
 
   const flagged = all<{
     id: number; body: string; author_name: string; initiative_id: number;
@@ -163,6 +165,10 @@ export default async function AdminPage() {
                       <Link href={`/initiatives/${l.entity_id}`} className="link">
                         #{l.entity_id}
                       </Link>
+                    ) : l.entity_id && l.entity === "feedback" && user.role === "ADMIN" ? (
+                      <Link href={`/feedback/${l.entity_id}`} className="link">
+                        хүсэлт #{l.entity_id}
+                      </Link>
                     ) : (
                       <span>{l.entity}{l.entity_id ? ` #${l.entity_id}` : ""}</span>
                     )}
@@ -186,6 +192,10 @@ export default async function AdminPage() {
           <Item label="Хариу хоцорсон" v={s.overdue} danger={s.overdue > 0} />
           <Item label="Хэрэгжиж буй" v={s.inProgress} />
           <Item label="Хэрэгжсэн" v={s.completed} />
+          <Item label="Санал, гомдол" v={fb.received} />
+          <Item label="Шийдвэрлэгдэж буй" v={fb.open} />
+          <Item label="Санал, гомдол хоцорсон" v={fb.overdue} danger={fb.overdue > 0} />
+          <Item label="Хугацаандаа хариулсан %" v={fb.onTimePct ?? 0} />
         </dl>
       </section>
     </div>

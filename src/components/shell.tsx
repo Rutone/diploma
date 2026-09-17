@@ -7,7 +7,7 @@ import { logout } from "@/app/actions";
 import {
   IconHome, IconMegaphone, IconClipboard, IconBook, IconShield, IconUsers,
   IconMenu, IconClose, IconMoon, IconSun, IconUser, IconCalendar, IconPlus,
-  IconClock, IconChart, IconLogout,
+  IconClock, IconChart, IconLogout, IconInbox, IconDesk,
 } from "./icons";
 import type { Role } from "@/lib/policy";
 
@@ -16,14 +16,19 @@ export type ShellUser = {
   short: string;
   role: Role;
   meta: string;
+  /** Нэгжийн хариуцагчид — шийдвэрлэх хүлээгдэж буй санал, гомдлын тоо. */
+  desk: number | null;
 } | null;
 
-export type ShellStats = { active: number; overdue: number };
+export type ShellStats = { active: number; overdue: number; feedbackOnTime: number | null };
 
 const TITLES: [RegExp, string][] = [
   [/^\/$/, "Нүүр"],
   [/^\/initiatives\/new$/, "Санаачилга дэвшүүлэх"],
   [/^\/initiatives\//, "Санаачилга"],
+  [/^\/feedback\/new$/, "Санал, гомдол илгээх"],
+  [/^\/feedback\/desk/, "Хүсэлтийн ширээ"],
+  [/^\/feedback/, "Санал, гомдол"],
   [/^\/journal/, "Хэрэгжилтийн дэвтэр"],
   [/^\/policy/, "Журам, бодлого"],
   [/^\/admin/, "Хяналтын самбар"],
@@ -33,7 +38,7 @@ const TITLES: [RegExp, string][] = [
 
 function titleFor(path: string) {
   for (const [re, t] of TITLES) if (re.test(path)) return t;
-  return "Санал санаачилга";
+  return "Санал, санаачилга";
 }
 
 /* ── Эмблем.  Бодит систем дээр сургуулийн албан ёсны лого тавина. ── */
@@ -84,11 +89,15 @@ export default function Shell({
 
   const isOfficer = user && user.role !== "MEMBER";
 
-  const nav = [
+  const nav: { href: string; label: string; icon: React.ReactNode; exact?: boolean; count?: number }[] = [
     { href: "/", label: "Нүүр", icon: <IconHome />, exact: true },
     { href: "/?tab=active", label: "Санаачилгууд", icon: <IconMegaphone /> },
+    { href: "/feedback", label: "Санал, гомдол", icon: <IconInbox /> },
     { href: "/journal", label: "Хэрэгжилтийн дэвтэр", icon: <IconClipboard /> },
     { href: "/policy", label: "Журам, бодлого", icon: <IconBook /> },
+    ...(user && user.desk !== null
+      ? [{ href: "/feedback/desk", label: "Хүсэлтийн ширээ", icon: <IconDesk />, count: user.desk }]
+      : []),
     ...(user && (user.role === "MODERATOR" || user.role === "ADMIN")
       ? [{ href: "/admin", label: "Хяналтын самбар", icon: <IconShield /> }]
       : []),
@@ -100,6 +109,7 @@ export default function Shell({
   const active = (href: string, exact?: boolean) => {
     const base = href.split("?")[0];
     if (exact) return path === "/";
+    if (base === "/feedback") return path.startsWith("/feedback") && !path.startsWith("/feedback/desk");
     return base !== "/" && path.startsWith(base);
   };
 
@@ -123,12 +133,12 @@ export default function Shell({
               className="text-[11.5px] font-medium leading-[1.35] uppercase"
               style={{ color: "var(--brand-ink)" }}
             >
-              Оюутны санал
+              Санал, санаачилгын
               <br />
-              санаачилгын систем
+              цахим платформ
             </div>
             <div className="text-[9.5px] text-ink3 leading-tight mt-1 uppercase tracking-wide">
-              Student initiative platform
+              Feedback &amp; initiative platform
             </div>
           </div>
           <button
@@ -151,11 +161,12 @@ export default function Shell({
             >
               {n.icon}
               <span>{n.label}</span>
+              {!!n.count && <span className="nav-count">{n.count}</span>}
             </Link>
           ))}
 
           {user && (
-            <div className="px-3 mt-3">
+            <div className="px-3 mt-3 space-y-2">
               <Link
                 href="/initiatives/new"
                 className="btn btn-primary w-full"
@@ -163,6 +174,14 @@ export default function Shell({
               >
                 <IconPlus />
                 Санаачилга дэвшүүлэх
+              </Link>
+              <Link
+                href="/feedback/new"
+                className="btn btn-ghost w-full"
+                onClick={() => setOpen(false)}
+              >
+                <IconInbox size={18} />
+                Санал, гомдол илгээх
               </Link>
             </div>
           )}
@@ -200,6 +219,17 @@ export default function Shell({
               <div className="text-[11.5px] text-ink3">Зөвлөлийн хариу</div>
             </div>
           </div>
+          <div className="side-tile">
+            <span className="tile-icon">
+              <IconInbox size={18} />
+            </span>
+            <div className="leading-tight min-w-0">
+              <div className="text-[14px] font-medium">
+                {stats.feedbackOnTime === null ? "—" : `${stats.feedbackOnTime}%`} хугацаандаа
+              </div>
+              <div className="text-[11.5px] text-ink3">Санал, гомдлын хариу</div>
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -217,8 +247,8 @@ export default function Shell({
             </button>
 
             <p className="text-[12.5px] text-ink3 leading-tight flex-1 min-w-0 hidden sm:block">
-              Босго давсан санаачилгад зөвлөл хугацаанд нь
-              <br className="hidden xl:block" /> бичгээр хариу өгөх үүрэгтэй
+              Санаачилга, санал, гомдол бүрт хариуцагч
+              <br className="hidden xl:block" /> хугацаанд нь бичгээр хариу өгөх үүрэгтэй
             </p>
 
             <button
@@ -273,11 +303,12 @@ export default function Shell({
               <Link href="/policy" className="link">Санал хураалтын журам</Link>
               <Link href="/policy#moderation" className="link">Модерацийн журам</Link>
               <Link href="/policy#privacy" className="link">Нууцлалын бодлого</Link>
-              <Link href="/policy#appeal" className="link">Гомдол гаргах</Link>
+              <Link href="/policy#feedback" className="link">Санал, гомдлын журам</Link>
+              <Link href="/policy#appeal" className="link">Давж заалдах</Link>
             </div>
             <p>
-              Оюутны санал санаачилгын цахим систем · бакалаврын дипломын ажлын хүрээнд
-              боловсруулсан загвар систем
+              Вебэд суурилсан санал, санаачилга хүлээн авах, дэмжлэг цуглуулах цахим платформ ·
+              бакалаврын дипломын ажлын хүрээнд боловсруулсан загвар систем
               {isOfficer ? " · удирдлагын эрхээр нэвтэрсэн" : ""}.
             </p>
           </div>

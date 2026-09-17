@@ -139,6 +139,55 @@ CREATE TABLE IF NOT EXISTS progress_updates (
   created_at    TEXT    NOT NULL
 );
 
+-- Санал, гомдол.
+--   Санаачилгаас ялгаатай нь нийтэд нээлттэй БИШ: зөвхөн илгээгч, хариуцах
+--   нэгжийн хариуцагч, админ харна. Нийтэд зөвхөн нэгж тус бүрийн нэгдсэн
+--   үзүүлэлт (хугацаандаа хариулсан хувь, сэтгэл ханамж) харагдана.
+--   anonymous = 1 үед author_name хадгалагдахгүй. author_id нь зөвхөн хариуг
+--   илгээгчид хүргэхэд хэрэглэгдэнэ; хариуцагчийн дэлгэцэнд харагдахгүй.
+CREATE TABLE IF NOT EXISTS feedback (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind            TEXT    NOT NULL,                  -- SUGGESTION | COMPLAINT
+  topic           TEXT    NOT NULL,
+  unit            TEXT    NOT NULL,                  -- одоо хариуцаж буй нэгж
+  title           TEXT    NOT NULL,
+  body            TEXT    NOT NULL,
+  author_id       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  author_name     TEXT    NOT NULL DEFAULT '',
+  author_meta     TEXT    NOT NULL DEFAULT '',
+  author_group    TEXT    NOT NULL DEFAULT 'STUDENT',
+  anonymous       INTEGER NOT NULL DEFAULT 0,
+  status          TEXT    NOT NULL DEFAULT 'RECEIVED',
+  outcome         TEXT,
+  handler_id      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  handler_name    TEXT    NOT NULL DEFAULT '',
+  created_at      TEXT    NOT NULL,
+  ack_due         TEXT    NOT NULL,                  -- хүлээн авах эцсийн хугацаа
+  due_at          TEXT    NOT NULL,                  -- хариу өгөх эцсийн хугацаа
+  acknowledged_at TEXT,
+  answered_at     TEXT,
+  closed_at       TEXT,
+  rating          INTEGER,                           -- 1..3, илгээгчийн үнэлгээ
+  reopen_count    INTEGER NOT NULL DEFAULT 0,
+  initiative_id   INTEGER REFERENCES initiatives(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_unit ON feedback(unit, status);
+CREATE INDEX IF NOT EXISTS idx_feedback_author ON feedback(author_id);
+
+-- Санал, гомдлын түүх. Илгээгч ба нэгжийн хоорондын бүх харилцаа энд.
+--   internal = 1 бол нэгжийн дотоод тэмдэглэл — илгээгчид харагдахгүй.
+CREATE TABLE IF NOT EXISTS feedback_events (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  feedback_id INTEGER NOT NULL REFERENCES feedback(id) ON DELETE CASCADE,
+  kind        TEXT    NOT NULL,
+  actor       TEXT    NOT NULL,                      -- AUTHOR | HANDLER | SYSTEM
+  actor_name  TEXT    NOT NULL DEFAULT '',
+  body        TEXT    NOT NULL DEFAULT '',
+  internal    INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_events ON feedback_events(feedback_id);
+
 -- Аудит лог. Дэмжлэгийн тоог гараар өөрчлөх боломжгүй байхын зэрэгцээ
 -- бүх удирдлагын үйлдэл эргэж мөшгигдөх ёстой.
 CREATE TABLE IF NOT EXISTS audit_log (

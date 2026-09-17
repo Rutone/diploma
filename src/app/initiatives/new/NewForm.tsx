@@ -40,20 +40,32 @@ function Counter({ value, min, max }: { value: string; min?: number; max?: numbe
   );
 }
 
+/** Санал, гомдлоос санаачилга болгох үед урьдчилан бөглөх утгууд. */
+export type Prefill = {
+  fromId: number;
+  code: string;
+  title: string;
+  summary: string;
+  body: string;
+  category: string;
+};
+
 export default function NewForm({
   options,
   defaultAudience,
+  prefill,
 }: {
   options: ScopeOption[];
   defaultAudience: Audience;
+  prefill?: Prefill;
 }) {
   const [state, action] = useActionState(
     createInitiative,
     null as { ok: boolean; error?: string } | null
   );
-  const [title, setTitle] = useState("");
-  const [summary, setSummary] = useState("");
-  const [body, setBody] = useState("");
+  const [title, setTitle] = useState(prefill?.title ?? "");
+  const [summary, setSummary] = useState(prefill?.summary ?? "");
+  const [body, setBody] = useState(prefill?.body ?? "");
 
   const audiences = [...new Set(options.map((o) => o.audience))];
   const [audience, setAudience] = useState<Audience>(
@@ -73,6 +85,17 @@ export default function NewForm({
 
   return (
     <form action={action} className="space-y-5">
+      {prefill && <input type="hidden" name="from" value={prefill.fromId} />}
+      {prefill && (
+        <div
+          className="rounded-[14px] p-4 text-[14px]"
+          style={{ background: "var(--violet-soft)", color: "var(--violet)" }}
+        >
+          <div className="font-medium mb-1">{prefill.code} дугаартай хүсэлтээс санаачилга үүсгэж байна</div>
+          Таны бичсэн агуулгыг урьдчилан бөглөв. Санаачилга нийтэд нээлттэй тул хувийн
+          мэдээллээ хасаж, олон хүнд хамаатай байдлаар засна уу.
+        </div>
+      )}
       <section className="card p-5 space-y-4">
         <div>
           <div className="flex items-center justify-between">
@@ -143,7 +166,7 @@ export default function NewForm({
           <label className="label" htmlFor="category">
             Ангилал
           </label>
-          <select id="category" name="category" className="select">
+          <select id="category" name="category" className="select" defaultValue={prefill?.category}>
             {Object.entries(CATEGORIES).map(([k, v]) => (
               <option key={k} value={k}>
                 {v}

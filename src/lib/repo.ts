@@ -4,6 +4,7 @@ import { bandFor, tallyFromRows, computeThreshold, emptyTally, type Tally } from
 import type { Status } from "./status";
 import { addMonths, addWorkingDays } from "./format";
 import { shortDivision } from "./auth";
+import { syncFeedback } from "./feedback";
 
 export type Initiative = {
   id: number;
@@ -126,6 +127,8 @@ export function syncLifecycle() {
     run(`UPDATE initiatives SET status = 'EXPIRED' WHERE id = ?`, e.id);
     audit("систем", "EXPIRE", "initiative", e.id, "Хүчинтэй хугацаа дуусав.");
   }
+
+  syncFeedback();
 }
 
 /** Зөвлөлийн хариу өгөх эцсийн хугацаа. */
