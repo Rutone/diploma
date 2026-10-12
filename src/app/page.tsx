@@ -1,295 +1,265 @@
 import Link from "next/link";
-import { syncLifecycle, listPublic, stats, listMine } from "@/lib/repo";
-import { currentUser } from "@/lib/auth";
-import { InitiativeCard, Empty, Notice, InfoRow } from "@/components/ui";
-import { AUDIENCES, CATEGORIES, POLICY, SCOPES, type Audience, type ScopeKey } from "@/lib/policy";
-import { STATUS_GROUPS, type Status } from "@/lib/status";
+import { prisma, type Audience, type InitiativeStatus } from "@/lib/prisma";
+import { currentUser } from "@/lib/auth/session";
+import { listInitiatives } from "@/lib/domain/initiatives";
+import { getThresholdParams } from "@/lib/settings";
+import { computeThreshold } from "@/lib/rules/threshold";
+import { AUDIENCES, INITIATIVE_TABS } from "@/lib/labels";
+import { InitiativeCard, Empty, Notice, StatTile, type InitiativeCardData } from "@/components/ui";
+import { IconBulb, IconInbox, IconPlus } from "@/components/icons";
 import { fmtNum } from "@/lib/format";
-import {
-  IconMegaphone, IconUsers, IconClipboard, IconCheck, IconAlert, IconChart, IconBulb, IconFlag,
-  IconInbox,
-} from "@/components/icons";
-import { feedbackTotals } from "@/lib/feedback";
 
 export const dynamic = "force-dynamic";
-
-const TABS: { key: string; label: string; statuses: Status[] }[] = [
-  { key: "active", label: "Санал хураалт явж буй", statuses: STATUS_GROUPS.ACTIVE },
-  { key: "council", label: "Зөвлөлд шилжсэн", statuses: ["COUNCIL"] },
-  { key: "progress", label: "Хэрэгжиж буй", statuses: ["IN_PROGRESS"] },
-  { key: "closed", label: "Хаагдсан", statuses: ["COMPLETED", "DECLINED", "FAILED", "EXPIRED"] },
-];
 
 export default async function Home({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string; cat?: string; aud?: string; q?: string }>;
 }) {
-  syncLifecycle();
-
   const sp = await searchParams;
-  const tabKey = sp.tab && TABS.some((t) => t.key === sp.tab) ? sp.tab : "active";
-  const tab = TABS.find((t) => t.key === tabKey)!;
-  const cat = sp.cat && sp.cat in CATEGORIES ? sp.cat : undefined;
+  const tab = INITIATIVE_TABS.find((t) => t.key === sp.tab) ?? INITIATIVE_TABS[0];
   const aud = sp.aud && sp.aud in AUDIENCES ? (sp.aud as Audience) : undefined;
   const q = sp.q?.trim() || undefined;
 
-  const user = await currentUser();
-  const s = stats();
-  const fb = feedbackTotals();
-  const items = listPublic(tab.statuses, { category: cat, audience: aud, q });
-  const myDrafts = user
-    ? listMine(user.id).filter((m) =>
-        ["GATHERING", "MODERATION", "RETURNED"].includes(m.status)
+  const [user, categories] = await Promise.all([
+    currentUser(),
+    prisma.category.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
+  ]);
+  const cat = sp.cat ? categories.find((c) => c.code === sp.cat) : undefined;
+
+  const [items, counts, members, params, myDrafts, openRequests] = await Promise.all([
+    listInitiatives({
+      statuses: tab.statuses as InitiativeStatus[],
+      categoryId: cat?.id,
+      audience: aud,
+      q,
+    }),
+    Promise.all(
+      INITIATIVE_TABS.map((t) =>
+        prisma.initiative.count({ where: { status: { in: t.statuses as InitiativeStatus[] } } })
       )
-    : [];
+    ),
+    prisma.user.count({ where: { active: true } }),
+    getThresholdParams(),
+    user
+      ? prisma.initiative.count({
+          where: { authorId: user.id, status: { in: ["IN_REVIEW", "REJECTED"] } },
+        })
+      : Promise.resolve(0),
+    user
+      ? prisma.request.count({
+          where: {
+            authorId: user.id,
+            status: { in: ["SUBMITTED", "ROUTED", "AT_MODERATOR", "IN_PROGRESS", "ANSWERED"] },
+          },
+        })
+      : Promise.resolve(0),
+  ]);
+
+  const commentCounts = await prisma.comment.groupBy({
+    by: ["initiativeId"],
+    where: {
+      initiativeId: { in: items.map((i) => i.id) },
+      deletedAt: null,
+      hiddenAt: null,
+    },
+    _count: { _all: true },
+  });
+  const commentBy = new Map(commentCounts.map((c) => [c.initiativeId, c._count._all]));
 
   const qs = (over: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
-    const merged = { tab: tabKey, cat, aud, q, ...over };
+    const merged = { tab: tab.key, cat: sp.cat, aud: sp.aud, q, ...over };
     for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
-    return `/?${p.toString()}`;
+    const s = p.toString();
+    return s ? `/?${s}` : "/";
   };
+
+  const universityThreshold = computeThreshold(members, params);
 
   return (
     <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-5 items-start">
-      {/* ═══ Үндсэн багана ═══ */}
       <div className="space-y-4 min-w-0">
-        {/* Танилцуулга — порталын зарын картын хэв маяг */}
+        {/* ── Танилцуулга ── */}
         <section className="card p-5">
-          <div className="flex items-start gap-3">
-            <span className="avatar" style={{ background: "var(--brand)", color: "#fff" }}>
-              <IconMegaphone size={19} />
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-[16px] font-medium">Санал, санаачилгын цахим платформ</h2>
-              <p className="text-[12.5px] text-ink3 mb-2.5">
-                Оюутан · Багш · Ажилтан · Сургуулийн зөвлөл
-              </p>
-              <p className="text-[14.5px] text-ink2">
-                Санал, гомдлоо хариуцах нэгжид шууд илгээж, олон хүнд хамаатай өөрчлөлтөд
-                санаачилга дэвшүүлж дэмжлэг цуглуулна. Хүсэлт бүрт хариуцагч тогтоосон
-                хугацаанд бичгээр хариулж, хоцрогдол нийтэд ил харагдана.
-              </p>
-              {!user && (
-                <Link href="/login" className="btn btn-primary btn-sm mt-3.5">
-                  Оюутны код / ажилтны дугаараар нэвтрэх
-                </Link>
-              )}
+          <h2 className="text-[20px] font-medium leading-snug">
+            Санал, санаачилгын цахим платформ
+          </h2>
+          <p className="text-[13px] text-ink3 mt-1">
+            Оюутан · Багш · Ажилтан · Хариуцсан нэгжүүд
+          </p>
+          <p className="text-[14.5px] text-ink2 mt-3 leading-relaxed">
+            Хувийн шинжтэй санал, гомдлоо нууцлалтайгаар хариуцсан нэгжид шууд илгээнэ. Олон хүнд
+            хамаатай асуудлаар нийтийн санаачилга дэвшүүлж дэмжлэг цуглуулна. Тогтоосон босгод
+            хүрсэн санаачилгад хариуцсан нэгж хуульд нийцсэн хугацаанд албан хариу өгөх үүрэг
+            хүлээнэ.
+          </p>
+
+          {!user && (
+            <div className="mt-4">
+              <Link href="/auth/login" className="btn btn-primary">
+                ШУТИС SSO-оор нэвтрэх
+              </Link>
             </div>
-          </div>
-          <div className="grid sm:grid-cols-3 gap-2.5 mt-4 pt-4 border-t border-line">
-            <Link href={user ? "/initiatives/new" : "/login"} className="choice" style={{ padding: "11px 13px" }}>
-              <span className="choice-icon" style={{ width: 34, height: 34 }}>
-                <IconMegaphone size={18} />
+          )}
+
+          <div className="grid sm:grid-cols-2 gap-2 mt-4">
+            <Link href="/initiatives/new" className="choice">
+              <span className="choice-icon">
+                <IconBulb size={20} />
               </span>
-              <span className="min-w-0 leading-tight">
-                <span className="block text-[14px] font-medium">Санаачилга</span>
-                <span className="block text-[12px] text-ink3 mt-0.5">Дэмжлэг цуглуулах</span>
-              </span>
+              <div>
+                <div className="font-medium text-[14.5px]">Санаачилга</div>
+                <div className="hint">Олон хүнд хамаатай өөрчлөлт — дэмжлэг цуглуулна</div>
+              </div>
             </Link>
-            <Link href={user ? "/feedback/new?kind=SUGGESTION" : "/login"} className="choice" style={{ padding: "11px 13px" }}>
-              <span className="choice-icon" style={{ width: 34, height: 34 }}>
-                <IconBulb size={18} />
+            <Link href="/requests/new" className="choice">
+              <span className="choice-icon">
+                <IconInbox size={20} />
               </span>
-              <span className="min-w-0 leading-tight">
-                <span className="block text-[14px] font-medium">Санал</span>
-                <span className="block text-[12px] text-ink3 mt-0.5">Нэгжид сайжруулах санаа</span>
-              </span>
-            </Link>
-            <Link href={user ? "/feedback/new?kind=COMPLAINT" : "/login"} className="choice" style={{ padding: "11px 13px" }}>
-              <span
-                className="choice-icon"
-                style={{ width: 34, height: 34, background: "var(--warn-soft)", color: "var(--warn)" }}
-              >
-                <IconFlag size={18} />
-              </span>
-              <span className="min-w-0 leading-tight">
-                <span className="block text-[14px] font-medium">Гомдол</span>
-                <span className="block text-[12px] text-ink3 mt-0.5">Доголдол, зөрчил</span>
-              </span>
+              <div>
+                <div className="font-medium text-[14.5px]">Санал, гомдол</div>
+                <div className="hint">Хувийн шинжтэй — нэгжид шууд очно</div>
+              </div>
             </Link>
           </div>
         </section>
 
-        {s.overdue > 0 && (
-          <Notice tone="red" title="Зөвлөлийн хариу хугацаа хэтэрсэн байна">
-            {s.overdue} санаачилгад хугацаандаа хариу өгөөгүй байна. Хоцрогдол нийтэд
-            автоматаар ил харагдана.{" "}
-            <Link href={qs({ tab: "council" })} className="link">
-              Жагсаалтыг харах
-            </Link>
+        {(myDrafts > 0 || openRequests > 0) && user && (
+          <Notice tone="violet" title="Таны идэвхтэй хүсэлтүүд">
+            {myDrafts > 0 && (
+              <>
+                {myDrafts} санаачилга хяналтад эсвэл засварлахаар хүлээгдэж байна.{" "}
+              </>
+            )}
+            {openRequests > 0 && (
+              <>
+                {openRequests} санал, гомдол шийдвэрлэгдэж байна.{" "}
+                <Link href="/requests" className="link">
+                  Харах →
+                </Link>
+              </>
+            )}
           </Notice>
         )}
 
-        {myDrafts.length > 0 && (
-          <section className="card">
-            <div className="card-title">Миний бэлтгэж буй санаачилга</div>
-            <div className="p-3 space-y-3">
-              {myDrafts.map((c) => (
-                <InitiativeCard key={c.id} c={c} flat />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Шүүлтүүр */}
-        <section className="card p-4 space-y-3">
-          <div className="flex flex-wrap gap-1.5">
-            {TABS.map((t) => (
-              <Link
-                key={t.key}
-                href={qs({ tab: t.key })}
-                className={`badge ${t.key === tabKey ? "badge-blue" : "badge-gray"}`}
-                style={{ padding: "6px 14px", fontSize: 13.5 }}
-              >
-                {t.label}
-              </Link>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-1.5">
+        {/* ── Шүүлтүүр ── */}
+        <div className="tabs">
+          {INITIATIVE_TABS.map((t, i) => (
             <Link
-              href={qs({ cat: undefined })}
-              className={`badge ${!cat ? "badge-violet" : "badge-gray"}`}
+              key={t.key}
+              href={qs({ tab: t.key })}
+              className="tab"
+              data-active={t.key === tab.key}
             >
-              Бүх ангилал
+              {t.label}
+              <span className="nav-count">{counts[i]}</span>
             </Link>
-            {Object.entries(CATEGORIES).map(([k, v]) => (
-              <Link
-                key={k}
-                href={qs({ cat: k })}
-                className={`badge ${cat === k ? "badge-violet" : "badge-gray"}`}
-              >
-                {v}
-              </Link>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            <Link
-              href={qs({ aud: undefined })}
-              className={`badge ${!aud ? "badge-violet" : "badge-gray"}`}
-            >
-              Бүх бүлэг
-            </Link>
-            {(Object.keys(AUDIENCES) as Audience[]).map((k) => (
-              <Link
-                key={k}
-                href={qs({ aud: k })}
-                className={`badge ${aud === k ? "badge-violet" : "badge-gray"}`}
-                title={AUDIENCES[k].hint}
-              >
-                {AUDIENCES[k].label}
-              </Link>
-            ))}
-          </div>
-
-          <form>
-            <input type="hidden" name="tab" value={tabKey} />
-            {cat && <input type="hidden" name="cat" value={cat} />}
-            {aud && <input type="hidden" name="aud" value={aud} />}
-            <input
-              name="q"
-              defaultValue={q ?? ""}
-              className="input"
-              placeholder="Санаачилга хайх…"
-              aria-label="Санаачилга хайх"
-            />
-          </form>
-        </section>
-
-        <div className="space-y-3">
-          {items.length === 0 ? (
-            <Empty
-              text={
-                q
-                  ? `«${q}» гэсэн хайлтад тохирох санаачилга олдсонгүй.`
-                  : "Энэ ангилалд одоогоор санаачилга байхгүй байна."
-              }
-            />
-          ) : (
-            items.map((c) => <InitiativeCard key={c.id} c={c} />)
-          )}
+          ))}
         </div>
+
+        <div className="card p-3 flex flex-wrap gap-2">
+          <Link href={qs({ cat: undefined })} className="tab" data-active={!sp.cat}>
+            Бүх ангилал
+          </Link>
+          {categories.map((c) => (
+            <Link key={c.id} href={qs({ cat: c.code })} className="tab" data-active={sp.cat === c.code}>
+              {c.name}
+            </Link>
+          ))}
+        </div>
+
+        <div className="card p-3 flex flex-wrap gap-2">
+          <Link href={qs({ aud: undefined })} className="tab" data-active={!sp.aud}>
+            Бүх бүлэг
+          </Link>
+          {(Object.keys(AUDIENCES) as Audience[]).map((a) => (
+            <Link key={a} href={qs({ aud: a })} className="tab" data-active={sp.aud === a}>
+              {AUDIENCES[a].label}
+            </Link>
+          ))}
+        </div>
+
+        {/* ── Жагсаалт ── */}
+        {items.length === 0 ? (
+          <Empty text="Энэ шүүлтүүрт тохирох санаачилга алга байна." />
+        ) : (
+          <div className="space-y-3">
+            {items.map((i) => (
+              <InitiativeCard
+                key={i.id}
+                c={{ ...(i as unknown as InitiativeCardData), commentCount: commentBy.get(i.id) ?? 0 }}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* ═══ Хажуугийн багана ═══ */}
-      <aside className="space-y-4 lg:sticky lg:top-[120px]">
-        <section className="card">
-          <div className="card-title">Системийн товч мэдээлэл</div>
-          <div className="p-4 space-y-0.5">
-            <InfoRow icon={<IconChart />} label={`${fmtNum(s.active)} санал хураалт явж байна`} />
-            <InfoRow icon={<IconUsers />} label={`${fmtNum(s.council)} санаачилга зөвлөлд шилжсэн`} />
-            <InfoRow icon={<IconClipboard />} label={`${fmtNum(s.inProgress)} санаачилга хэрэгжиж байна`} />
-            <InfoRow icon={<IconCheck />} label={`${fmtNum(s.completed)} санаачилга хэрэгжсэн`} />
-            <InfoRow
-              icon={<IconAlert />}
-              label={`${fmtNum(s.overdue)} зөвлөлийн хариу хоцорсон`}
-              danger={s.overdue > 0}
-            />
-            <InfoRow
-              icon={<IconInbox size={16} />}
-              label={`${fmtNum(fb.received)} санал, гомдол · ${fb.onTimePct ?? "—"}% хугацаандаа хариулсан`}
-            />
-            {fb.overdue > 0 && (
-              <InfoRow
-                icon={<IconAlert />}
-                label={`${fmtNum(fb.overdue)} санал, гомдлын хариу хоцорсон`}
-                danger
-              />
-            )}
-            <div className="pt-3 mt-2 border-t border-line text-[13px] text-ink3">
-              Нийт {fmtNum(s.members)} гишүүн: {fmtNum(s.students)} оюутан ·{" "}
-              {fmtNum(s.teachers)} багш · {fmtNum(s.staff)} ажилтан. {fmtNum(s.votes)} санал
-              бүртгэгдсэн.
-            </div>
-          </div>
-        </section>
+      {/* ── Хажуугийн багана ── */}
+      <aside className="space-y-3 lg:sticky lg:top-4">
+        {user && (
+          <Link href="/initiatives/new" className="btn btn-primary w-full">
+            <IconPlus />
+            Санаачилга дэвшүүлэх
+          </Link>
+        )}
 
-        <section className="card">
-          <div className="card-title">Санаачилга хэрхэн ажилладаг вэ</div>
-          <ol className="p-4 space-y-3 text-[13.5px] text-ink2">
+        <div className="card p-4 space-y-3">
+          <h3 className="sec-title">Систем хэрхэн ажилладаг вэ</h3>
+          <ol className="steps">
             {[
-              [`Оюутан, багш, ажилтан санаачилга бичиж, хэн санал өгөхийг сонгоод ${POLICY.ENDORSEMENTS_REQUIRED} хүний урьдчилсан дэмжлэг цуглуулна.`],
-              [`Модератор ${POLICY.MODERATION_HOURS} цагийн дотор журамд нийцэж буй эсэхийг шалгана.`],
-              ["Хамрах бүлгийн эрх бүхий хүмүүс хугацаанд нь санал өгнө. Үр дүн бүлэг тус бүрээр харагдана."],
-              [`Босго давбал зөвлөл ${POLICY.COUNCIL_RESPONSE_DAYS} ажлын өдрийн дотор бичгээр хариулна.`],
-              ["Дэмжвэл хариуцагч томилогдож, хэрэгжилт нийтэд мөшгигдөнө."],
-            ].map(([text], i) => (
-              <li key={i} className="flex gap-2.5">
-                <span
-                  className="shrink-0 w-[22px] h-[22px] rounded-full grid place-items-center text-[12px] font-medium"
-                  style={{ background: "var(--brand-soft)", color: "var(--brand-ink)" }}
-                >
-                  {i + 1}
-                </span>
-                <span>{text}</span>
+              "Гишүүн санаачилга бичиж, хамрах хүрээгээ сонгоод модераторт илгээнэ.",
+              "Модератор агуулгын дүрэм болон хамрах хүрээг шалгаж батална.",
+              "Систем хамрах хүрээний гишүүдийн тооноос босгыг автоматаар тооцно.",
+              "Гишүүд санаачилгыг нэг удаа дэмжинэ. Босгод хүрвэл хариуцсан нэгжид шилжинэ.",
+              "Нэгж хуульд нийцсэн хугацаанд албан хариу өгнө. Хоцрогдол нийтэд ил харагдана.",
+            ].map((s, i) => (
+              <li key={i} className="step">
+                <span className="step-dot">{i + 1}</span>
+                <span>{s}</span>
               </li>
             ))}
           </ol>
-        </section>
+        </div>
 
-        <section className="card">
-          <div className="card-title">Босгын хэмжээ</div>
-          <table className="data">
-            <tbody>
-              {(Object.keys(SCOPES) as ScopeKey[]).map((k) => (
-                <tr key={k}>
-                  <td className="text-[13.5px]">{SCOPES[k].label}</td>
-                  <td className="text-right tabular-nums whitespace-nowrap text-[13.5px]">
-                    {SCOPES[k].percent}% · {SCOPES[k].days} хоног
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="p-4 pt-3">
-            <Link href="/policy" className="link text-[13.5px]">
-              Бүрэн журам үзэх →
-            </Link>
+        <div className="card p-4">
+          <h3 className="sec-title mb-3">Дэмжлэгийн босго</h3>
+          <p className="text-[13.5px] text-ink2 leading-relaxed">
+            Босгыг тогтмол тоогоор бус, санаачилгын хамрах хүрээний гишүүдийн тооноос (N) систем
+            автоматаар тооцно:
+          </p>
+          <p className="my-3 text-center text-[15px] tabular-nums" style={{ color: "var(--brand)" }}>
+            B = ⌈max(p·N, min(T<sub>min</sub>, q·N))⌉
+          </p>
+          <div className="space-y-1 text-[13.5px] text-ink2">
+            <div className="flex justify-between">
+              <span>p — үндсэн хувь</span>
+              <span className="tabular-nums">{(params.p * 100).toFixed(1)}%</span>
+            </div>
+            <div className="flex justify-between">
+              <span>
+                T<sub>min</sub> — доод хязгаар
+              </span>
+              <span className="tabular-nums">{params.tMin}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>q — дээд таг</span>
+              <span className="tabular-nums">{(params.q * 100).toFixed(0)}%</span>
+            </div>
           </div>
-        </section>
+          <p className="hint mt-3">
+            Их сургууль даяарх санаачилгад N = {fmtNum(members)} тул босго {universityThreshold}{" "}
+            байна. Босго батлах үед хөлдөх тул явцын дунд өөрчлөгдөхгүй.
+          </p>
+          <Link href="/policy" className="link text-[13.5px] mt-2 inline-block">
+            Бүрэн журам үзэх →
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <StatTile label="Нийт гишүүн" value={members} tone="blue" />
+          <StatTile label="Санаачилга" value={counts.reduce((a, b) => a + b, 0)} />
+        </div>
       </aside>
     </div>
   );

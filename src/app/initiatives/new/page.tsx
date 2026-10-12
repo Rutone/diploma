@@ -1,20 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import NewForm, { type Prefill, type ScopeOption } from "./NewForm";
-import { currentUser, eligibleByGroup } from "@/lib/auth";
-import { computeThreshold } from "@/lib/scoring";
-import { SCOPES, audiencesFor, feedbackCode, type FeedbackTopic, type ScopeKey } from "@/lib/policy";
-import { eventsFor, getFeedback, isFeedbackAuthor } from "@/lib/feedback";
-
-/** Санал, гомдлын сэдэв → санаачилгын ангилал. */
-const TOPIC_TO_CATEGORY: Record<FeedbackTopic, string> = {
-  ACADEMIC: "ACADEMIC",
-  STUDENT: "DORM",
-  FINANCE: "FINANCE",
-  DIGITAL: "DIGITAL",
-  FACILITY: "FACILITY",
-  ETHICS: "OTHER",
-};
+import { prisma, type Audience, type Scope } from "@/lib/prisma";
+import { currentUser } from "@/lib/auth/session";
+import { allowedAudiences, canUseClassScope, scopeSize } from "@/lib/domain/scope";
+import { computeThreshold } from "@/lib/rules/threshold";
+import { getThresholdParams } from "@/lib/settings";
+import { Notice } from "@/components/ui";
+import { NewInitiativeForm } from "./NewForm";
 
 export const dynamic = "force-dynamic";
 
@@ -24,77 +16,90 @@ export default async function NewInitiativePage({
   searchParams: Promise<{ from?: string }>;
 }) {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/auth/login");
 
-  // Санал, гомдлоос санаачилга болгох — зөвхөн илгээгч өөрөө.
-  const { from } = await searchParams;
-  const source = from ? getFeedback(Number(from)) : undefined;
-  let prefill: Prefill | undefined;
-  if (source && isFeedbackAuthor(user, source) && !source.initiative_id) {
-    const answer = eventsFor(source.id, false).filter((e) => e.kind === "ANSWER").pop();
-    const firstPara = source.body.split(/\n\s*\n/)[0].replace(/\s+/g, " ").trim();
-    prefill = {
-      fromId: source.id,
-      code: feedbackCode(source),
-      title: source.title,
-      summary: firstPara.length > 280 ? `${firstPara.slice(0, 277)}…` : firstPara,
-      body: answer
-        ? `${source.body}\n\nХариуцах нэгжийн (${source.unit}) дүгнэлт:\n${answer.body}`
-        : source.body,
-      category: TOPIC_TO_CATEGORY[source.topic] ?? "OTHER",
-    };
+  const sp = await searchParams;
+  const fromRequestId = Number(sp.from ?? 0) || undefined;
+
+  const [categories, params] = await Promise.all([
+    prisma.category.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
+    getThresholdParams(),
+  ]);
+
+  const audiences = allowedAudiences(user.memberType);
+  const canClass = canUseClassScope(user.memberType, "STUDENT");
+
+  // Хамрах хүрээ бүрийн N болон босгыг урьдчилан тооцож харуулна —
+  // зохиогч сонголтынхоо үр дагаврыг мэдэж байх ёстой.
+  const combos: { scope: Scope; audience: Audience }[] = [];
+  for (const a of audiences) {
+    combos.push({ scope: "UNIVERSITY", audience: a });
+    if (user.schoolId) combos.push({ scope: "SCHOOL", audience: a });
+    if (canClass && a === "STUDENT" && user.schoolId && user.year) {
+      combos.push({ scope: "CLASS", audience: a });
+    }
   }
 
-  // Хүрээ нь үргэлж дэвшүүлэгчийн өөрийн харьяаллаас тодорхойлогдоно.
-  const refs: Record<ScopeKey, { ref: string; label: string }> = {
-    SCHOOL: { ref: "", label: SCOPES.SCHOOL.label },
-    DIVISION: { ref: user.division, label: user.division },
-    CLASS: { ref: `${user.division}|${user.year}`, label: `${user.division} · ${user.year}-р курс` },
-  };
-
-  // Дүрэм: зөвхөн ӨӨРИЙН бүлэг багтсан хамрах бүлэгт санаачилга дэвшүүлнэ.
-  const options: ScopeOption[] = [];
-  for (const audience of audiencesFor(user.group_key)) {
-    for (const scope of Object.keys(SCOPES) as ScopeKey[]) {
-      // Анги, курсын хүрээ зөвхөн оюутан, зөвхөн оюутны хамрах бүлэгт.
-      if (SCOPES[scope].studentsOnly && (user.group_key !== "STUDENT" || audience !== "STUDENT"))
-        continue;
-      const byGroup = eligibleByGroup(audience, scope, refs[scope].ref);
-      const eligible = Object.values(byGroup).reduce((a, b) => a + b, 0);
-      options.push({
-        audience,
-        scope,
-        label: refs[scope].label,
-        eligible,
-        byGroup,
-        threshold: computeThreshold(scope, eligible).thresholdScore,
-        days: SCOPES[scope].days,
+  const sizes = await Promise.all(
+    combos.map(async (c) => {
+      const n = await scopeSize({
+        scope: c.scope,
+        audience: c.audience,
+        schoolId: c.scope === "UNIVERSITY" ? null : user.schoolId,
+        classYear: c.scope === "CLASS" ? user.year : null,
       });
+      return [`${c.scope}:${c.audience}`, { n, threshold: computeThreshold(n, params) }] as const;
+    })
+  );
+
+  const scopeSizes = Object.fromEntries(sizes);
+
+  let source: { id: number; title: string } | null = null;
+  if (fromRequestId) {
+    const r = await prisma.request.findUnique({
+      where: { id: fromRequestId },
+      select: { id: true, title: true, authorId: true, convertedInitiativeId: true },
+    });
+    if (r && r.authorId === user.id && r.convertedInitiativeId === null) {
+      source = { id: r.id, title: r.title };
     }
   }
 
   return (
-    <div className="max-w-2xl space-y-5">
-      <div>
-        <p className="text-[14.5px] text-ink2">
-          Сургуулийн эрх мэдлийн хүрээнд шийдэгдэх, тодорхой үйлдэл шаардсан санал бичнэ үү.
-          Тодорхой хувь хүн рүү чиглэсэн, эсвэл сургуулийн эрх мэдлээс гадуурх санаачилга
-          буцаагдана —{" "}
-          <Link href="/policy#moderation" className="link">
-            модерацийн журам
-          </Link>
-          . Хувийн асуудал, үйлчилгээний доголдлыг{" "}
-          <Link href="/feedback/new?kind=COMPLAINT" className="link">
-            гомдол
-          </Link>{" "}
-          эсвэл{" "}
-          <Link href="/feedback/new?kind=SUGGESTION" className="link">
-            санал
-          </Link>{" "}
-          хэлбэрээр хариуцах нэгжид шууд илгээнэ үү.
+    <div className="mx-auto max-w-[760px] space-y-4">
+      {source && (
+        <Notice tone="violet" title="Хаалттай хүсэлтээс хөрвүүлж байна">
+          «{source.title}» хүсэлтийг нийтийн санаачилга болгож байна. Илгээсний дараа хоёр нь
+          хоорондоо холбогдож, явц мөшгигдөнө.
+        </Notice>
+      )}
+
+      <div className="card p-5 sm:p-6">
+        <h2 className="text-[19px] font-medium mb-1">Санаачилга дэвшүүлэх</h2>
+        <p className="text-[14px] text-ink2 leading-relaxed mb-5">
+          Олон хүнд хамаатай өөрчлөлтийг энд дэвшүүлнэ. Модератор агуулгын дүрэмд нийцэж буйг
+          шалгасны дараа нийтэд нээгдэж, хамрах хүрээний гишүүд дэмжинэ. Босгод хүрвэл хариуцсан
+          нэгж албан хариу өгөх үүрэг хүлээнэ.
         </p>
+
+        <NewInitiativeForm
+          categories={categories.map((c) => ({ id: c.id, name: c.name, hint: c.hint }))}
+          allowedAudiences={audiences}
+          canUseClass={canClass && !!user.schoolId && !!user.year}
+          schoolName={user.schoolCode}
+          classYear={user.year}
+          scopeSizes={scopeSizes}
+          fromRequestId={source?.id}
+        />
       </div>
-      <NewForm options={options} defaultAudience={user.group_key} prefill={prefill} />
+
+      <Notice tone="blue" title="Хувийн шинжтэй асуудал бол">
+        Зөвхөн танд хамаатай санал, гомдлыг{" "}
+        <Link href="/requests/new" className="link">
+          хаалттай сувгаар
+        </Link>{" "}
+        илгээвэл нууцлалтайгаар, дэмжлэг цуглуулахгүйгээр шууд хариуцсан нэгжид очно.
+      </Notice>
     </div>
   );
 }

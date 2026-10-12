@@ -1,9 +1,8 @@
 node_modules
 .next
 out
-data/*.db
-data/*.db-wal
-data/*.db-shm
+# Prisma-гийн үүсгэсэн client — npx prisma generate-ээр дахин үүснэ
+src/generated
 .env*.local
 .DS_Store
 *.tsbuildinfo

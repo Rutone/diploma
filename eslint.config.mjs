@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Prisma-гийн үүсгэсэн код — засварлахгүй тул шалгахгүй.
+    "src/generated/**",
   ]),
 ]);
 

@@ -1,32 +1,46 @@
 import Link from "next/link";
-import { STATUS_META, type Status } from "@/lib/status";
-import { CATEGORIES, SCOPES, STAR_BANDS } from "@/lib/policy";
-import { progressPercent, starsText, bandFor } from "@/lib/scoring";
-import { fmtNum, remaining, fmtDate, shortName } from "@/lib/format";
-import type { Card } from "@/lib/repo";
-import { scopeLabel, audienceLabel } from "@/lib/repo";
-import { IconChat } from "./icons";
+import type { ReactNode } from "react";
+import {
+  AUDIENCES,
+  INITIATIVE_STATUS,
+  REQUEST_KINDS,
+  REQUEST_STATUS,
+  RESPONSE_OUTCOMES,
+  SCOPES,
+  type Tone,
+} from "@/lib/labels";
+import type { InitiativeStatus, RequestStatus, ResponseOutcome } from "@/lib/prisma";
+import { supportProgress } from "@/lib/rules/threshold";
+import { fmtDate, fmtNum, remaining, shortName } from "@/lib/format";
+import { IconChat, IconClock, IconUsers } from "./icons";
 
-export function StatusBadge({ status }: { status: Status }) {
-  const m = STATUS_META[status];
-  return <span className={`badge badge-${m.tone}`}>{m.label}</span>;
+/* ═══ Үндсэн жижиг элементүүд ════════════════════════════════════ */
+
+export function Badge({ tone, children }: { tone: Tone; children: ReactNode }) {
+  return <span className={`badge badge-${tone}`}>{children}</span>;
 }
 
-export function Stars({ n, size = 15 }: { n: number; size?: number }) {
-  return (
-    <span className="stars" style={{ fontSize: size }} aria-label={`${n} од`}>
-      {starsText(n)}
-    </span>
-  );
+export function InitiativeBadge({ status }: { status: InitiativeStatus }) {
+  const m = INITIATIVE_STATUS[status];
+  return <Badge tone={m.tone}>{m.label}</Badge>;
 }
 
-/** Порталын "Оюутны товч мэдээлэл" картын мөрийн хэв маяг */
+export function RequestBadge({ status }: { status: RequestStatus }) {
+  const m = REQUEST_STATUS[status];
+  return <Badge tone={m.tone}>{m.label}</Badge>;
+}
+
+export function OutcomeBadge({ outcome }: { outcome: ResponseOutcome }) {
+  const m = RESPONSE_OUTCOMES[outcome];
+  return <Badge tone={m.tone}>{m.label}</Badge>;
+}
+
 export function InfoRow({
   icon,
   label,
   danger,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   danger?: boolean;
 }) {
@@ -38,219 +52,362 @@ export function InfoRow({
   );
 }
 
-/** Дэмжлэгийн прогресс. Хувийг ард нь бодож, урд нь ТООГ харуулна. */
-export function Progress({
-  score,
-  thresholdScore,
+export function Empty({ text }: { text: string }) {
+  return <div className="card p-8 text-center text-ink3 text-[14px]">{text}</div>;
+}
+
+export function Notice({
+  tone = "blue",
+  title,
+  children,
+}: {
+  tone?: Tone;
+  title?: string;
+  children: ReactNode;
+}) {
+  const bg: Record<Tone, string> = {
+    gray: "var(--surface-2)",
+    blue: "var(--info-soft)",
+    green: "var(--ok-soft)",
+    amber: "var(--warn-soft)",
+    red: "var(--bad-soft)",
+    violet: "var(--violet-soft)",
+  };
+  const fg: Record<Tone, string> = {
+    gray: "var(--ink-2)",
+    blue: "var(--info)",
+    green: "var(--ok)",
+    amber: "var(--warn)",
+    red: "var(--bad)",
+    violet: "var(--violet)",
+  };
+  return (
+    <div
+      className="rounded-[var(--radius)] px-4 py-3 text-[14px] leading-relaxed"
+      style={{ background: bg[tone], color: fg[tone], border: "1px solid transparent" }}
+    >
+      {title && <div className="font-semibold mb-0.5">{title}</div>}
+      <div style={{ color: "var(--ink-2)" }}>{children}</div>
+    </div>
+  );
+}
+
+/* ═══ Дэмжлэгийн прогресс ════════════════════════════════════════
+   Тайлангийн загвараар дэмжлэг нь ТООЛУУР — эсрэг санал, оноо байхгүй.
+   Харуулах зүйл: дэмжсэн хүний тоо / босго.                        */
+
+export function SupportProgress({
+  supportCount,
+  threshold,
+  scopeSizeN,
   compact = false,
 }: {
-  score: number;
-  thresholdScore: number;
+  supportCount: number;
+  threshold: number;
+  scopeSizeN?: number;
   compact?: boolean;
 }) {
-  const pct = progressPercent(score, thresholdScore);
-  const reached = score >= thresholdScore;
-  const negative = score < 0;
-  const color = negative ? "var(--bad)" : reached ? "var(--ok)" : "var(--brand)";
+  const pct = supportProgress(supportCount, threshold);
+  const reached = supportCount >= threshold;
+  const color = reached ? "var(--ok)" : "var(--brand)";
 
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3 mb-1.5">
         <div className="text-[14px]">
-          <span className="font-medium" style={{ color }}>
-            {fmtNum(score)}
+          <span className="font-semibold" style={{ color }}>
+            {fmtNum(supportCount)}
           </span>
-          <span className="text-ink3"> / {fmtNum(thresholdScore)} оноо</span>
+          <span className="text-ink3"> / {fmtNum(threshold)} дэмжлэг</span>
         </div>
         <div className="text-[13px] text-ink3">{pct}%</div>
       </div>
       <div className="track">
-        <div
-          className="fill"
-          style={{ width: `${Math.max(pct, negative ? 2 : 0)}%`, background: color }}
-        />
+        <div className="fill" style={{ width: `${pct}%`, background: color }} />
       </div>
       {!compact && (
         <p className="hint">
-          {negative
-            ? "Цэвэр оноо сөрөг байна — эсэргүүцэл дэмжлэгээс давж байна."
-            : reached
-              ? "Босго давсан. Хугацаа дуустал дэмжлэг үргэлжлэн цуглана."
-              : `Босго давахад ${fmtNum(thresholdScore - score)} оноо дутуу байна.`}
+          {reached
+            ? "Босго давсан. Хариуцсан нэгж албан хариу өгөх үүрэгтэй."
+            : `Босго давахад ${fmtNum(threshold - supportCount)} дэмжлэг дутуу байна.` +
+              (scopeSizeN ? ` Хамрах хүрээнд ${fmtNum(scopeSizeN)} гишүүн.` : "")}
         </p>
       )}
     </div>
   );
 }
 
-/** Саналын тархалт — ил тод байдлын үндсэн элемент. */
-export function Distribution({ dist }: { dist: Record<number, number> }) {
-  const rows = [
-    { v: 2, label: "Бүрэн дэмжсэн", color: "var(--ok)" },
-    { v: 1, label: "Дэмжсэн", color: "#4e9c76" },
-    { v: 0, label: "Төвийг сахисан", color: "var(--ink-3)" },
-    { v: -1, label: "Дэмжээгүй", color: "#c9806b" },
-    { v: -2, label: "Огт дэмжээгүй", color: "var(--bad)" },
-  ];
-  const max = Math.max(1, ...rows.map((r) => dist[r.v] ?? 0));
-  return (
-    <div className="space-y-1.5">
-      {rows.map((r) => {
-        const n = dist[r.v] ?? 0;
-        return (
-          <div key={r.v} className="flex items-center gap-3 text-[13.5px]">
-            <div className="w-[112px] shrink-0 text-ink2">{r.label}</div>
-            <div className="flex-1 h-[7px] rounded-full bg-surface2 overflow-hidden border border-line">
-              <div style={{ width: `${(n / max) * 100}%`, background: r.color, height: "100%" }} />
-            </div>
-            <div className="w-9 text-right tabular-nums text-ink2">{n}</div>
-            <div className="w-11 text-right tabular-nums text-ink3 text-[12.5px]">
-              {r.v > 0 ? `+${r.v * n}` : r.v * n === 0 ? "0" : r.v * n}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+/* ═══ Хамрах хүрээний тэмдэг ═════════════════════════════════════ */
 
-export function ScopeChip({ scope, scopeRef }: { scope: keyof typeof SCOPES; scopeRef: string }) {
+export function ScopeChip({
+  scope,
+  audience,
+  schoolCode,
+  classYear,
+}: {
+  scope: keyof typeof SCOPES;
+  audience: keyof typeof AUDIENCES;
+  schoolCode?: string | null;
+  classYear?: number | null;
+}) {
+  const where =
+    scope === "UNIVERSITY"
+      ? "Их сургууль даяар"
+      : scope === "SCHOOL"
+        ? (schoolCode ?? "Бүрэлдэхүүн сургууль")
+        : `${schoolCode ?? ""} · ${classYear ?? ""}-р курс`;
+
   return (
-    <span className="badge badge-gray" title={SCOPES[scope].hint}>
-      {scopeLabel(scope, scopeRef)}
+    <span className="inline-flex items-center gap-1.5 text-[13px] text-ink3">
+      <IconUsers size={14} />
+      {where}
+      <span className="text-ink3">·</span>
+      {AUDIENCES[audience].short}
     </span>
   );
 }
 
-export function StarVerdict({ stars }: { stars: number }) {
-  const band = STAR_BANDS.find((b) => b.stars === stars);
-  if (!band) return null;
+/* ═══ Хугацаа ════════════════════════════════════════════════════ */
+
+export function Deadline({
+  at,
+  prefix = "",
+  overduePrefix = "хугацаа хэтэрсэн:",
+}: {
+  at: Date | string | null | undefined;
+  prefix?: string;
+  overduePrefix?: string;
+}) {
+  if (!at) return null;
+  const iso = typeof at === "string" ? at : at.toISOString();
+  const r = remaining(iso);
   return (
-    <div className="card">
-      <div className="card-title">Эцсийн үнэлгээ</div>
-      <div className="p-4">
-        <div className="flex items-center gap-3 mb-1.5">
-          <Stars n={stars} size={18} />
-          <span className="text-[14px] font-medium">{stars} од</span>
+    <span
+      className="inline-flex items-center gap-1.5 text-[13px]"
+      style={{ color: r.overdue ? "var(--bad)" : "var(--ink-3)" }}
+    >
+      <IconClock size={14} />
+      {r.overdue ? `${overduePrefix} ${r.text}` : `${prefix}${r.text}`.trim()}
+    </span>
+  );
+}
+
+/* ═══ Санаачилгын карт ═══════════════════════════════════════════ */
+
+export type InitiativeCardData = {
+  id: number;
+  title: string;
+  summary: string;
+  status: InitiativeStatus;
+  scope: keyof typeof SCOPES;
+  audience: keyof typeof AUDIENCES;
+  classYear: number | null;
+  supportCount: number;
+  threshold: number;
+  scopeSizeN: number;
+  collectUntil: Date | null;
+  responseDueAt: Date | null;
+  category: { name: string };
+  school: { code: string } | null;
+  author: { name: string } | null;
+  unit: { name: string } | null;
+  commentCount?: number;
+};
+
+export function InitiativeCard({ c }: { c: InitiativeCardData }) {
+  const open = c.status === "COLLECTING" || c.status === "PAUSED";
+  const awaiting = c.status === "THRESHOLD_MET" || c.status === "OVERDUE";
+
+  return (
+    <article className="card p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <div className="avatar shrink-0" aria-hidden>
+          {shortName(c.author?.name ?? "—")
+            .split(" ")
+            .map((w) => w[0])
+            .join("")
+            .slice(0, 2)}
         </div>
-        <p className="text-[14px] text-ink2 mb-2">{band.note}</p>
-        {band.veto !== "—" && (
-          <p className="text-[13px] text-ink3">
-            Зөвлөлийн эрх: <span className="text-ink2">{band.veto}</span>
-          </p>
-        )}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <InitiativeBadge status={c.status} />
+            <span className="text-[13px] text-ink3">{c.category.name}</span>
+          </div>
+
+          <h3 className="card-title">
+            <Link href={`/initiatives/${c.id}`} className="link">
+              {c.title}
+            </Link>
+          </h3>
+
+          <div className="mt-1 mb-2">
+            <ScopeChip
+              scope={c.scope}
+              audience={c.audience}
+              schoolCode={c.school?.code}
+              classYear={c.classYear}
+            />
+          </div>
+
+          <p className="text-[14px] text-ink2 leading-relaxed line-clamp-2">{c.summary}</p>
+
+          {(open || awaiting || c.threshold > 0) && (
+            <div className="mt-3">
+              <SupportProgress
+                supportCount={c.supportCount}
+                threshold={c.threshold}
+                compact
+              />
+            </div>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            {open && <Deadline at={c.collectUntil} prefix="цуглуулахад " />}
+            {awaiting && (
+              <Deadline at={c.responseDueAt} prefix="хариу өгөхөд " overduePrefix="хариу хоцорсон:" />
+            )}
+            {c.unit && <span className="text-[13px] text-ink3">{c.unit.name}</span>}
+            {typeof c.commentCount === "number" && c.commentCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 text-[13px] text-ink3">
+                <IconChat size={14} /> {c.commentCount}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
+    </article>
+  );
+}
+
+/* ═══ Санал, гомдлын мөр ═════════════════════════════════════════ */
+
+export type RequestRowData = {
+  id: number;
+  kind: keyof typeof REQUEST_KINDS;
+  status: RequestStatus;
+  title: string;
+  submittedAt: Date;
+  dueAt: Date;
+  extended: boolean;
+  category: { name: string };
+  unit: { name: string } | null;
+};
+
+export function requestCodeOf(r: { id: number; kind: keyof typeof REQUEST_KINDS; submittedAt: Date }) {
+  return `${REQUEST_KINDS[r.kind].prefix}-${r.submittedAt.getUTCFullYear()}-${String(r.id).padStart(4, "0")}`;
+}
+
+export function RequestRow({ r, href }: { r: RequestRowData; href: string }) {
+  const open = ["SUBMITTED", "ROUTED", "AT_MODERATOR", "IN_PROGRESS"].includes(r.status);
+  return (
+    <article className="card p-4">
+      <div className="flex flex-wrap items-center gap-2 mb-1">
+        <Badge tone={REQUEST_KINDS[r.kind].tone}>{REQUEST_KINDS[r.kind].label}</Badge>
+        <RequestBadge status={r.status} />
+        <span className="text-[13px] text-ink3 font-mono">{requestCodeOf(r)}</span>
+      </div>
+
+      <h3 className="card-title">
+        <Link href={href} className="link">
+          {r.title}
+        </Link>
+      </h3>
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        <span className="text-[13px] text-ink3">{r.category.name}</span>
+        {r.unit && <span className="text-[13px] text-ink3">{r.unit.name}</span>}
+        <span className="text-[13px] text-ink3">Илгээсэн {fmtDate(r.submittedAt.toISOString())}</span>
+        {open && <Deadline at={r.dueAt} prefix="хариу өгөхөд " />}
+        {r.extended && <span className="text-[13px] text-ink3">сунгасан</span>}
+      </div>
+    </article>
+  );
+}
+
+/* ═══ Төлөвийн түүх ══════════════════════════════════════════════ */
+
+export function Timeline({
+  items,
+}: {
+  items: { toStatus: string; actorLabel: string; reason: string; createdAt: Date; label: string }[];
+}) {
+  if (!items.length) return null;
+  return (
+    <ol className="timeline">
+      {items.map((it, i) => (
+        <li key={i} className="tl-item">
+          <span className="tl-dot" aria-hidden />
+          <div className="tl-body">
+            <div className="text-[14px] font-medium">{it.label}</div>
+            <div className="text-[13px] text-ink3">
+              {it.actorLabel} · {fmtDate(it.createdAt.toISOString())}
+            </div>
+            {it.reason && <p className="text-[13px] text-ink2 mt-1 leading-relaxed">{it.reason}</p>}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/* ═══ Албан хариу ════════════════════════════════════════════════ */
+
+export function ResponseBlock({
+  r,
+}: {
+  r: {
+    outcome: ResponseOutcome;
+    body: string;
+    dueDate: Date | null;
+    createdAt: Date;
+    responder: { name: string } | null;
+  };
+}) {
+  return (
+    <div className="card p-4 sm:p-5" style={{ borderLeft: "3px solid var(--ok)" }}>
+      <div className="flex flex-wrap items-center gap-2 mb-2">
+        <OutcomeBadge outcome={r.outcome} />
+        <span className="text-[13px] text-ink3">
+          {r.responder?.name ?? "Нэгж"} · {fmtDate(r.createdAt.toISOString())}
+        </span>
+      </div>
+      <p className="prose-body whitespace-pre-wrap">{r.body}</p>
+      {r.dueDate && (
+        <p className="hint mt-2">Хэрэгжүүлэх эцсийн хугацаа: {fmtDate(r.dueDate.toISOString())}</p>
+      )}
     </div>
   );
 }
 
-function initials(name: string) {
-  const p = name.trim().split(/\s+/);
-  return ((p[0]?.[0] ?? "") + (p[1]?.[0] ?? "")).toUpperCase();
-}
+/* ═══ Статистик хайрцаг ══════════════════════════════════════════ */
 
-export function InitiativeCard({ c, flat = false }: { c: Card; flat?: boolean }) {
-  const live = c.status === "ACTIVE";
-  const rem = remaining(c.ends_at);
-  const stars = c.final_stars ?? bandFor(c.tally.score, c.threshold_score).stars;
-  const showStars = !["GATHERING", "MODERATION", "RETURNED", "ACTIVE"].includes(c.status);
-
-  return (
-    <Link
-      href={`/initiatives/${c.id}`}
-      className={flat ? "block p-3 rounded-xl hover:bg-surface2 transition-colors" : "card block p-5 hover:border-line2 transition-colors"}
-    >
-      <div className="flex items-start gap-3">
-        <span className="avatar" title={c.author_name}>
-          {initials(c.author_name)}
-        </span>
-
-        <div className="min-w-0 flex-1">
-          <h3 className="text-[16px] font-medium leading-snug">{c.title}</h3>
-          <p className="text-[12.5px] text-ink3 mt-0.5 mb-2.5">
-            {shortName(c.author_name)} · {audienceLabel(c.audience)} ·{" "}
-            {scopeLabel(c.scope, c.scope_ref)} ·{" "}
-            {CATEGORIES[c.category] ?? "Бусад"}
-          </p>
-
-          <p className="text-[14.5px] text-ink2 mb-3.5 line-clamp-2">{c.summary}</p>
-
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <StatusBadge status={c.status} />
-            {showStars && <Stars n={stars} size={13} />}
-            {live && (
-              <span className={`badge ${rem.overdue ? "badge-red" : "badge-gray"}`}>
-                {rem.text}
-              </span>
-            )}
-          </div>
-
-          {live ? (
-            <Progress score={c.tally.score} thresholdScore={c.threshold_score} compact />
-          ) : (
-            <div className="flex items-center gap-3 text-[13px] text-ink3">
-              <span>{fmtNum(c.tally.turnout)} санал</span>
-              {c.closed_at && (
-                <>
-                  <span>·</span>
-                  <span>{fmtDate(c.closed_at)}</span>
-                </>
-              )}
-            </div>
-          )}
-
-          {c.comment_count > 0 && (
-            <div className="flex items-center gap-1.5 mt-3 text-[12.5px] text-ink3">
-              <IconChat />
-              <span>{c.comment_count} сэтгэгдэл</span>
-            </div>
-          )}
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-export function Empty({ text }: { text: string }) {
-  return <div className="card p-10 text-center text-ink3 text-[14.5px]">{text}</div>;
-}
-
-export function Notice({
+export function StatTile({
+  label,
+  value,
+  hint,
   tone = "gray",
-  title,
-  children,
 }: {
-  tone?: "gray" | "amber" | "red" | "green" | "blue" | "violet";
-  title?: string;
-  children: React.ReactNode;
+  label: string;
+  value: string | number;
+  hint?: string;
+  tone?: Tone;
 }) {
-  const bg: Record<string, string> = {
-    gray: "var(--surface-2)",
-    amber: "var(--warn-soft)",
-    red: "var(--bad-soft)",
-    green: "var(--ok-soft)",
-    blue: "var(--info-soft)",
-    violet: "var(--violet-soft)",
-  };
-  const fg: Record<string, string> = {
-    gray: "var(--ink-2)",
+  const fg: Record<Tone, string> = {
+    gray: "var(--ink)",
+    blue: "var(--brand)",
+    green: "var(--ok)",
     amber: "var(--warn)",
     red: "var(--bad)",
-    green: "var(--ok)",
-    blue: "var(--info)",
     violet: "var(--violet)",
   };
   return (
-    <div
-      className="rounded-[14px] p-4 text-[14px] border"
-      style={{ background: bg[tone], borderColor: tone === "gray" ? "var(--line)" : "transparent" }}
-    >
-      {title && (
-        <div className="font-medium mb-1" style={{ color: fg[tone] }}>
-          {title}
-        </div>
-      )}
-      <div style={{ color: tone === "gray" ? "var(--ink-2)" : fg[tone] }}>{children}</div>
+    <div className="side-tile">
+      <div className="text-[22px] font-semibold leading-tight" style={{ color: fg[tone] }}>
+        {typeof value === "number" ? fmtNum(value) : value}
+      </div>
+      <div className="text-[13px] text-ink2 mt-0.5">{label}</div>
+      {hint && <div className="hint mt-1">{hint}</div>}
     </div>
   );
 }

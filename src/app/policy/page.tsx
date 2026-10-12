@@ -1,513 +1,302 @@
-import {
-  AUDIENCES,
-  GROUPS,
-  POLICY,
-  SCOPES,
-  VOTE_OPTIONS,
-  STAR_BANDS,
-  REJECTION_REASONS,
-  COMMENT_REPORT_REASONS,
-  type Audience,
-  type ScopeKey,
-  FEEDBACK_KINDS,
-  FEEDBACK_TOPICS,
-  FEEDBACK_OUTCOMES,
-  FEEDBACK_POLICY,
-  type FeedbackKind,
-  type FeedbackTopic,
-  type FeedbackOutcome,
-} from "@/lib/policy";
-import { Stars, Notice } from "@/components/ui";
+import { prisma } from "@/lib/prisma";
+import { getBreaks, getDeadlineParams, getModerationParams, getThresholdParams } from "@/lib/settings";
+import { computeThreshold, TARGET_SUCCESS_RATE } from "@/lib/rules/threshold";
+import { AUDIENCES, REJECTION_REASONS, SCOPES } from "@/lib/labels";
+import { Notice } from "@/components/ui";
+import { fmtNum } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Журам · Санал, санаачилгын цахим платформ" };
-
-export default function PolicyPage() {
+function Section({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="max-w-3xl mx-auto space-y-10">
+    <section id={id} className="card p-5 sm:p-6 scroll-mt-4">
+      <h3 className="text-[17px] font-medium mb-3">{title}</h3>
+      <div className="space-y-3 text-[14.5px] text-ink2 leading-relaxed">{children}</div>
+    </section>
+  );
+}
+
+export default async function PolicyPage() {
+  const [threshold, deadlines, moderation, breaks, categories, members] = await Promise.all([
+    getThresholdParams(),
+    getDeadlineParams(),
+    getModerationParams(),
+    getBreaks(),
+    prisma.category.findMany({ where: { active: true }, include: { unit: true }, orderBy: { sortOrder: "asc" } }),
+    prisma.user.count({ where: { active: true } }),
+  ]);
+
+  const pct = (x: number) => `${(x * 100).toFixed(x * 100 < 10 ? 1 : 0)}%`;
+
+  return (
+    <div className="mx-auto max-w-[840px] space-y-4">
       <div>
-        <p className="text-[15px] text-ink2">
-          Энэ хуудсан дээрх бүх тоо системийн тохиргооноос шууд уншигдаж байна. Өөрөөр
-          хэлбэл нийтлэгдсэн журам ба кодын ажиллагаа хоёр зөрөх боломжгүй.
+        <h2 className="text-[19px] font-medium">Журам, бодлого</h2>
+        <p className="text-[13.5px] text-ink3 mt-0.5">
+          Энэ хуудасны бүх тоо системийн бодит тохиргооноос уншигдаж байна — админ өөрчлөхөд
+          энд шууд тусна.
         </p>
       </div>
 
-      {/* ── Санал хураалтын журам ── */}
-      <section id="voting" className="space-y-4">
-        <h2 className="text-[19px] font-medium">1. Санал хураалтын журам</h2>
-
-        <h3 className="text-[15px] font-medium">1.1 Хамрах бүлэг — хэн санал өгөх вэ</h3>
-        <p className="text-[14px] text-ink2">
-          Системийн хэрэглэгч оюутан, багш, ажилтан гэсэн гурван бүлэгт хуваагдана. Бүлэг нь
-          удирдлагын эрхээс (модератор, зөвлөл) тусдаа: багш нэгэн зэрэг модератор байж
-          болно. Санаачлагч санал хураалтад аль бүлэг оролцохыг сонгох бөгөөд{" "}
-          <strong className="font-medium text-ink">зөвхөн өөрийн бүлэг багтсан</strong> хамрах
-          бүлгийг сонгож чадна.
+      <Section id="channels" title="Хоёр суваг">
+        <p>
+          Платформ хүсэлтийг шинж чанараар нь хоёр сувагт ялгана.
         </p>
-        <div className="card overflow-x-auto">
-          <table className="data">
+        <p>
+          <strong>Хаалттай суваг — санал, гомдол.</strong> Хувь хүнд хамаарах асуудал. Дэмжлэг
+          цуглуулахгүйгээр хариуцсан нэгжид шууд очно. Зөвхөн гаргагч, хариуцсан нэгж, модератор
+          харна.
+        </p>
+        <p>
+          <strong>Нээлттэй суваг — нийтийн санаачилга.</strong> Олон нийтэд хамаарах асуудал.
+          Гишүүдийн дэмжлэгийг цуглуулж, тогтоосон босгод хүрмэгц хариуцсан нэгжээс албан хариу
+          авах эрх нээгдэнэ.
+        </p>
+        <p>
+          Хаалттай гомдолд хугацаандаа хариу ирээгүй, эсвэл хариу хангалтгүй бол{" "}
+          <strong>зөвхөн гаргагч өөрөө</strong> үүнийг нийтийн санаачилга болгон хөрвүүлж болно.
+        </p>
+      </Section>
+
+      <Section id="legal" title="Хуулийн хугацаа">
+        <p>
+          «Иргэдээс төрийн байгууллага, албан тушаалтанд гаргасан өргөдөл, гомдлыг шийдвэрлэх
+          тухай хууль»-ийн 16.1, 16.2 дахь хугацаанд нийцүүлэв.
+        </p>
+        <ul className="space-y-1.5 list-disc pl-5">
+          <li>
+            <strong>Гомдол — {deadlines.complaintDays} хоног.</strong> Нэгжийн удирдлага
+            шалтгаантайгаар <strong>нэг удаа</strong>, {deadlines.complaintExtensionDays} хүртэл
+            хоногоор сунгаж болно.
+          </li>
+          <li>
+            <strong>Санал — {deadlines.suggestionDays} хоног.</strong> Сунгалтгүй.
+          </li>
+          <li>
+            Хугацаа нь <strong>хуанлийн өдрөөр</strong> тоологдох ба хичээлийн амралтаар
+            зогсохгүй.
+          </li>
+          <li>
+            Хугацаа <strong>хүсэлт илгээсэн өдрөөс</strong> тоологдоно. Хүсэлт нэгжээс нэгж рүү
+            шилжсэн ч дахин эхлэхгүй — ингэснээр шилжүүлэх замаар хугацаа сунгах цоорхой хаагдана.
+          </li>
+        </ul>
+      </Section>
+
+      <Section id="threshold" title="Дэмжлэгийн босго">
+        <p>
+          Босго нь олонхын дэмжлэгийг хэмждэггүй. Босго нь зөвхөн гурван зүйлийг батална:
+          асуудал хувь хүний хүрээнээс хальсан эсэх; хариу өгөхөд зарцуулах ажлын цагийг
+          зөвтгөх эсэх; систем ажиллагаатай хэвээр байх эсэх.
+        </p>
+        <p className="text-center text-[16px] py-2" style={{ color: "var(--brand)" }}>
+          B = ⌈max(p·N, min(T<sub>min</sub>, q·N))⌉
+        </p>
+        <ul className="space-y-1.5 list-disc pl-5">
+          <li>
+            <strong>N</strong> — санаачилгын хамрах хүрээний идэвхтэй гишүүдийн тоо
+          </li>
+          <li>
+            <strong>p = {pct(threshold.p)}</strong> — үндсэн хувь. UCL Students&apos; Union 1%,
+            Сангмёнгийн их сургууль 0.8% гэсэн жишигт тулгуурлав.
+          </li>
+          <li>
+            <strong>T<sub>min</sub> = {threshold.tMin}</strong> — дунд хэмжээний нэгжид хэт бага
+            босго тогтохоос сэргийлэх доод хязгаар.
+          </li>
+          <li>
+            <strong>q = {pct(threshold.q)}</strong> — доод хязгаар нь гишүүдийн тооны энэ хувиас
+            хэтрэхгүй байх дээд таг. Үүнгүй бол 23 гишүүнтэй нэгж 25 гэсэн босгод хэзээ ч
+            хүрэхгүй.
+          </li>
+        </ul>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[14px]">
             <thead>
-              <tr>
-                <th>Хамрах бүлэг</th>
-                <th>Оролцох бүлгүүд</th>
-                <th>Тайлбар</th>
+              <tr className="text-left text-ink3 text-[13px]">
+                <th className="py-2 pr-3 font-normal">Хамрах хүрээний хэмжээ</th>
+                <th className="py-2 px-3 font-normal text-right">Босго</th>
+                <th className="py-2 pl-3 font-normal text-right">Эзлэх хувь</th>
               </tr>
             </thead>
             <tbody>
-              {(Object.keys(AUDIENCES) as Audience[]).map((k) => (
-                <tr key={k}>
-                  <td className="whitespace-nowrap">{AUDIENCES[k].label}</td>
-                  <td className="whitespace-nowrap text-ink2">
-                    {AUDIENCES[k].groups.map((g) => GROUPS[g].label).join(", ")}
-                  </td>
-                  <td className="text-ink2">{AUDIENCES[k].hint}</td>
-                </tr>
-              ))}
+              {[members, 2811, 1091, 335, 45, 23].map((n) => {
+                const b = computeThreshold(n, threshold);
+                return (
+                  <tr key={n} className="border-t border-line">
+                    <td className="py-1.5 pr-3 tabular-nums">{fmtNum(n)} гишүүн</td>
+                    <td className="py-1.5 px-3 text-right tabular-nums">{b}</td>
+                    <td className="py-1.5 pl-3 text-right tabular-nums text-ink3">
+                      {((b / n) * 100).toFixed(1)}%
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-        {POLICY.FLAG_OPPOSED_GROUP && (
-          <p className="text-[14px] text-ink2">
-            Олон бүлэгт хамаарах санал хураалтын үр дүн бүлэг тус бүрээр тусад нь
-            нийтлэгдэнэ. Аль нэг бүлгийн цэвэр оноо сөрөг гарвал зөвлөлд тусгайлан
-            анхааруулна — олонхи бүлэг цөөнх бүлгийн эрх ашгийг дарахаас сэргийлнэ.
-          </p>
-        )}
-
-        <h3 className="text-[15px] font-medium">1.2 Хамрах хүрээ, босго, хугацаа</h3>
-        <div className="card overflow-x-auto">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Хамрах хүрээ</th>
-                <th>Босго</th>
-                <th>Хугацаа</th>
-                <th>Хэн санал өгөх вэ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(Object.keys(SCOPES) as ScopeKey[]).map((k) => (
-                <tr key={k}>
-                  <td>{SCOPES[k].label}</td>
-                  <td className="tabular-nums">{SCOPES[k].percent}%</td>
-                  <td className="tabular-nums">{SCOPES[k].days} хоног</td>
-                  <td className="text-ink2">{SCOPES[k].hint}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-[14px] text-ink2">
-          Босго нь тухайн хамрах бүлэг, хүрээнд санал өгөх эрхтэй хүний тооноос хувиар
-          тооцогдоно. Эрхтэй хүний тоог санаачилга дэвшүүлэх мөчид царцаана — дараа нь хүний
-          тоо өөрчлөгдсөн ч босго хөдлөхгүй.
-        </p>
-
-        <Notice tone="gray" title="Босго яагаад тохируулагдах параметр вэ">
-          Дэлхийн туршлагаас: Мадрид хотын Decide Madrid систем босгоо 2%-иас 1% болгож
-          бууруулахаас өөр аргагүй болсон (нэг ч санал давж чадаагүй). Германы Bundestag
-          2024 онд босгоо 50,000-аас 30,000 болгож, хугацааг 4-өөс 6 долоо хоног болгож
-          сунгасан. Босго хэт өндөр байх нь оролцоог үхүүлдэг тул эдгээр тоог бодит
-          өгөгдлөөр калибрлах боломжтой байхаар зохион байгуулсан.
+        <Notice tone="gray">
+          Босго нь санаачилга <strong>батлагдах үед нэг удаа</strong> тооцогдож хадгалагдана.
+          Дараа нь параметр өөрчлөгдсөн ч тухайн санаачилгын босго хөдлөхгүй — цуглуулж байх
+          хугацаанд «зорилт» шилжихгүй. Модератор босгын тоонд шууд нөлөөлөх боломжгүй.
         </Notice>
-
-        <h3 className="text-[15px] font-medium">1.3 Саналын жин</h3>
-        <p className="text-[14px] text-ink2">
-          Санал хоёртын (тийм/үгүй) биш, таван шатлалтай. Эсрэг санал оноог хасна —
-          ингэснээр цөөнхийн идэвхтэй бүлэг олонхийн эсрэг байр суурийг тойрч гарах
-          боломжгүй болно.
+        <p>
+          Улирал бүрийн эцэст систем босго давсан санаачилгын хувийг тооцно. Энэ нь{" "}
+          {pct(TARGET_SUCCESS_RATE.min)}–{pct(TARGET_SUCCESS_RATE.max)}-ийн хүрээнээс гарвал
+          параметрийг тохируулахыг админд санал болгоно. Эцсийн шийдвэрийг админ гаргаж,
+          өөрчлөлт бүр бүртгэгдэнэ.
         </p>
-        <div className="card overflow-x-auto">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Сонголт</th>
-                <th>Оноо</th>
-              </tr>
-            </thead>
-            <tbody>
-              {VOTE_OPTIONS.map((o) => (
-                <tr key={o.value}>
-                  <td>{o.label}</td>
-                  <td className="tabular-nums">{o.weight > 0 ? `+${o.weight}` : o.weight}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      </Section>
 
-        <h3 className="text-[15px] font-medium">1.4 Одны зэрэглэл ба зөвлөлийн эрх</h3>
-        <p className="text-[14px] text-ink2">
-          Үр дүн «давсан / унасан» гэсэн хоёр утга биш. Дэмжлэг хүчтэй байх тусам зөвлөлийн
-          хориг тавих эрх хумигдана — энэ нь хууль ёсны байдлын градиент юм.
+      <Section id="scope" title="Хамрах хүрээ ба дэмжих эрх">
+        <p>
+          Санаачилга үүсгэхдээ хоёр зүйлийг сонгоно: зохион байгуулалтын хүрээ болон хамрах
+          бүлэг. Хоёрын огтлолцол нь N-ийг тодорхойлно.
         </p>
-        <div className="card overflow-x-auto">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Зэрэглэл</th>
-                <th>Босгоос</th>
-                <th>Үр дагавар</th>
-              </tr>
-            </thead>
-            <tbody>
-              {STAR_BANDS.map((b) => (
-                <tr key={b.stars}>
-                  <td className="whitespace-nowrap">
-                    <Stars n={b.stars} size={13} />
-                  </td>
-                  <td className="tabular-nums whitespace-nowrap">
-                    {b.minRatio === -Infinity
-                      ? "сөрөг"
-                      : b.minRatio < 0.001
-                        ? "0-ээс дээш"
-                        : `${Math.round(b.minRatio * 100)}%-аас дээш`}
-                  </td>
-                  <td className="text-ink2">
-                    {b.note}
-                    {b.veto !== "—" && (
-                      <div className="text-[12.5px] text-ink3">Зөвлөлийн эрх: {b.veto}</div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <h3 className="text-[15px] font-medium">1.5 Бусад дүрэм</h3>
-        <ul className="text-[14px] text-ink2 space-y-1.5 list-disc pl-5">
-          <li>Нэг хүн нэг санаачилгад нэг л удаа санал өгнө. Саналыг өөрчлөх боломжгүй.</li>
-          <li>
-            Санал хураалтын хугацаа эхэлсний дараа өөрчлөгдөхгүй, сунгагдахгүй. Босго эрт
-            давсан ч хугацаа дуустал дэмжлэг үргэлжлэн цуглана.
-          </li>
-          <li>
-            Хугацаа дуустал саналын дэлгэрэнгүй тархалт нийтлэгдэхгүй. Зөвхөн нэгдсэн оноо,
-            ирц харагдана.
-          </li>
-          <li>
-            Санал өгөгч нэрээ олон нийтэд харуулах эсэхийг өөрөө сонгоно. Юу сонгосон нь аль
-            ч тохиолдолд нийтэд харагдахгүй.
-          </li>
-          <li>
-            Санал өгсөн хүн бүр баталгааны код авна. Үр дүн зарлагдсаны дараа тэр кодоор
-            өөрийн санал тоонд орсныг шалгаж болно.
-          </li>
-          <li>
-            ★★ авсан санаачилгыг {POLICY.RESUBMIT_MONTHS} сарын дараа дахин оруулж болно. ★
-            авсан санаачилгыг тэр хичээлийн жилд дахин оруулахгүй.
-          </li>
-        </ul>
-      </section>
-
-      {/* ── Модерацийн журам ── */}
-      <section id="moderation" className="space-y-4">
-        <h2 className="text-[19px] font-medium">2. Модерацийн журам</h2>
-        <p className="text-[14px] text-ink2">
-          Санаачилга нийтлэгдэхээс өмнө хоёр шүүлтүүр дамжина. Эхнийх нь санал өгөгчдийн
-          өөрсдийн шүүлт — нийтлэгдэхийн тулд зохиогчоос гадна хамрах бүлгийн{" "}
-          <strong className="font-medium text-ink">{POLICY.ENDORSEMENTS_REQUIRED} хүний</strong>{" "}
-          урьдчилсан дэмжлэг шаардлагатай. Хоёр дахь нь модератор.
-        </p>
-        <p className="text-[14px] text-ink2">
-          Модератор {POLICY.MODERATION_HOURS} цагийн дотор шийдэх үүрэгтэй. Буцаах
-          тохиолдолд доорх урьдчилан нийтлэгдсэн жагсаалтаас шалтгаанаа сонгож,{" "}
-          <strong className="font-medium text-ink">дор хаяж 60 тэмдэгтийн тайлбар</strong>{" "}
-          бичих үүрэгтэй. «Таалагдаагүй» гэх мэт дурын шалтгаанаар буцаах боломжгүй.
-        </p>
-        <div className="card p-5">
-          <h3 className="text-[14px] font-medium mb-2">Буцаах үндэслэлүүд</h3>
-          <ul className="text-[14px] text-ink2 space-y-1 list-disc pl-5">
-            {Object.values(REJECTION_REASONS).map((r) => (
-              <li key={r}>{r}</li>
-            ))}
-          </ul>
-        </div>
-        <p className="text-[14px] text-ink2">
-          Буцаагдсан санаачилгыг зохиогч засаад дахин илгээх эрхтэй. Буцаалтын тоо
-          хязгаарлагдахгүй.
-        </p>
-      </section>
-
-      {/* ── Хэлэлцүүлгийн дүрэм ── */}
-      <section id="comments" className="space-y-4">
-        <h2 className="text-[19px] font-medium">3. Хэлэлцүүлгийн дүрэм</h2>
-        <ul className="text-[14px] text-ink2 space-y-1.5 list-disc pl-5">
-          <li>
-            Сэтгэгдэл зөвхөн нэрээр бичигдэнэ. Дэмжлэг нууц байж болох ч сэтгэгдэл нууц
-            байхгүй.
-          </li>
-          <li>
-            Сэтгэгдлээ өөрөө устгаж болно — гэхдээ «энэ сэтгэгдлийг зохиогч устгасан» гэсэн
-            ул мөр үлдэнэ.
-          </li>
-          <li>
-            {POLICY.REPORTS_TO_HIDE} хүн мэдээлбэл сэтгэгдэл автоматаар нуугдаж, модератор
-            руу дараалалд орно.
-          </li>
-          <li>Санал хураалт хаагдсаны дараа шинэ сэтгэгдэл бичих боломжгүй.</li>
-          <li>Санаачлагчийн сэтгэгдэл тусгай тэмдэглэгээтэй харагдана.</li>
-        </ul>
-        <div className="card p-5">
-          <h3 className="text-[14px] font-medium mb-2">Мэдээлэх үндэслэлүүд</h3>
-          <ul className="text-[14px] text-ink2 space-y-1 list-disc pl-5">
-            {Object.values(COMMENT_REPORT_REASONS).map((r) => (
-              <li key={r}>{r}</li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      {/* ── Зөвлөлийн үүрэг ── */}
-      <section id="council" className="space-y-4">
-        <h2 className="text-[19px] font-medium">4. Зөвлөлийн үүрэг, хариуцлага</h2>
-        <ul className="text-[14px] text-ink2 space-y-1.5 list-disc pl-5">
-          <li>
-            Босго давсан өдрөөс хойш{" "}
-            <strong className="font-medium text-ink">{POLICY.COUNCIL_RESPONSE_DAYS} ажлын өдрийн дотор</strong>{" "}
-            бичгээр хариу өгөх үүрэгтэй.
-          </li>
-          <li>
-            Хариу нь дор хаяж{" "}
-            <strong className="font-medium text-ink">{POLICY.MIN_REASONING_CHARS} тэмдэгт</strong>{" "}
-            байх ёстой. «Татгалзав» гэсэн ганц үг систем хүлээн авахгүй.
-          </li>
-          <li>
-            Хугацаа хэтэрвэл санаачилгын карт дээр болон нүүр хуудсанд улаанаар
-            «хариу хоцорсон» гэж нийтэд харагдана.
-          </li>
-          <li>
-            ★★★★★ авсан санаачилгыг зөвлөл хориглох эрхгүй — зөвхөн хэрэгжүүлэх төлөвлөгөөг
-            баталгаажуулна.
-          </li>
-          <li>
-            Дэмжсэн тохиолдолд <strong className="font-medium text-ink">хариуцагч хүн, нэгж,
-            эцсийн хугацаа</strong> заавал заагдана. Эдгээргүйгээр шийдвэр хадгалагдахгүй.
-          </li>
-          <li>
-            Батлагдсан шийдвэр {POLICY.VALID_MONTHS} сарын хугацаанд хүчинтэй. Дараа нь
-            автоматаар архивт шилжинэ.
-          </li>
-          <li>
-            Зөвлөлийн хариу өгсөн дундаж хугацаа Хэрэгжилтийн дэвтэр хуудсанд нийтэд ил
-            харагдана.
-          </li>
-        </ul>
-      </section>
-
-      {/* ── Санал, гомдол ── */}
-      <section id="feedback" className="space-y-4">
-        <h2 className="text-[19px] font-medium">5. Санал, гомдол хүлээн авах журам</h2>
-        <p className="text-[14px] text-ink2">
-          Санаачилга нь олон хүнд хамаатай өөрчлөлтөд нийтийн дэмжлэг цуглуулдаг бол санал,
-          гомдол нь тодорхой асуудлыг{" "}
-          <strong className="font-medium text-ink">хариуцах нэгжид шууд</strong> хүргэдэг
-          хувийн суваг юм. Агуулга нь нийтэд нийтлэгдэхгүй.
-        </p>
-
-        <h3 className="text-[15px] font-medium">5.1 Төрөл ба хариу өгөх хугацаа</h3>
-        <div className="card overflow-x-auto">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Төрөл</th>
-                <th>Хүлээн авах</th>
-                <th>Хариу өгөх</th>
-                <th>Тайлбар</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(Object.keys(FEEDBACK_KINDS) as FeedbackKind[]).map((k) => (
-                <tr key={k}>
-                  <td className="whitespace-nowrap">{FEEDBACK_KINDS[k].label}</td>
-                  <td className="tabular-nums whitespace-nowrap">{FEEDBACK_POLICY.ACK_DAYS} ажлын өдөр</td>
-                  <td className="tabular-nums whitespace-nowrap">{FEEDBACK_KINDS[k].days} ажлын өдөр</td>
-                  <td className="text-ink2">{FEEDBACK_KINDS[k].hint}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <h3 className="text-[15px] font-medium">5.2 Хариуцах нэгж</h3>
-        <p className="text-[14px] text-ink2">
-          Илгээгч нэгжийн нэрийг мэдэх шаардлагагүй — сэдвээ сонгоход систем автоматаар
-          чиглүүлнэ. Буруу нэгжид очсон бол нэгж зөв нэгж рүү шалтгаантайгаар шилжүүлнэ.{" "}
-          <strong className="font-medium text-ink">Шилжүүлэх нь хариу өгөх хугацааг сунгахгүй.</strong>
-        </p>
-        <div className="card overflow-x-auto">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Сэдэв</th>
-                <th>Хариуцах нэгж</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(Object.keys(FEEDBACK_TOPICS) as FeedbackTopic[]).map((t) => (
-                <tr key={t}>
-                  <td>
-                    {FEEDBACK_TOPICS[t].label}
-                    <div className="text-[12.5px] text-ink3">{FEEDBACK_TOPICS[t].hint}</div>
-                  </td>
-                  <td className="text-ink2">{FEEDBACK_TOPICS[t].unit}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <h3 className="text-[15px] font-medium">5.3 Хариу ба үр дүн</h3>
-        <p className="text-[14px] text-ink2">
-          Нэгж эцсийн хариуг дор хаяж{" "}
-          <strong className="font-medium text-ink">{FEEDBACK_POLICY.ANSWER_MIN} тэмдэгтээр</strong>{" "}
-          бичиж, доорх үр дүнгийн аль нэгийг заавал сонгоно.
-        </p>
-        <ul className="text-[14px] text-ink2 space-y-1.5 list-disc pl-5">
-          {(Object.keys(FEEDBACK_OUTCOMES) as FeedbackOutcome[]).map((o) => (
-            <li key={o}>
-              <strong className="font-medium text-ink">{FEEDBACK_OUTCOMES[o].label}</strong> —{" "}
-              {FEEDBACK_OUTCOMES[o].hint}
+        <ul className="space-y-1.5 list-disc pl-5">
+          {(Object.keys(SCOPES) as (keyof typeof SCOPES)[]).map((s) => (
+            <li key={s}>
+              <strong>{SCOPES[s].label}</strong> — {SCOPES[s].hint}
             </li>
           ))}
         </ul>
-
-        <h3 className="text-[15px] font-medium">5.4 Илгээгчийн эрх</h3>
-        <ul className="text-[14px] text-ink2 space-y-1.5 list-disc pl-5">
-          <li>
-            Нэрээ нууцалж илгээж болно. Энэ тохиолдолд нэр, салбар, курс огт хадгалагдахгүй бөгөөд
-            хариуцах нэгж хэн илгээснийг мэдэхгүй.
-          </li>
-          <li>Нэгжтэй энэ хуудсаар дамжуулан мессеж солилцож, нэмэлт мэдээлэл өгнө.</li>
-          <li>
-            Хариу авснаас хойш {FEEDBACK_POLICY.REOPEN_DAYS} хоногийн дотор хариуг үнэлж хаах,
-            эсвэл хангалтгүй бол {FEEDBACK_POLICY.MAX_REOPEN} удаа дахин нээх эрхтэй. Дахин
-            нээгдсэн хүсэлтэд нэгж {FEEDBACK_POLICY.REOPEN_RESPONSE_DAYS} ажлын өдрийн дотор
-            хариулна. Хугацаанд нь үйлдэл хийгээгүй бол автоматаар хаагдана.
-          </li>
-          <li>
-            Нэгж «санаачилга болгохыг зөвлөсөн» бол, эсвэл санал олон хүнд хамаатай бол
-            илгээгч нэг товчоор санаачилга болгон дэвшүүлж болно.
-          </li>
-          <li>Спамаас сэргийлж нэг хүн 24 цагт {FEEDBACK_POLICY.DAILY_LIMIT} хүртэл хүсэлт илгээнэ.</li>
+        <ul className="space-y-1.5 list-disc pl-5">
+          {(Object.keys(AUDIENCES) as (keyof typeof AUDIENCES)[]).map((a) => (
+            <li key={a}>
+              <strong>{AUDIENCES[a].label}</strong> — {AUDIENCES[a].hint}
+            </li>
+          ))}
         </ul>
-
-        <h3 className="text-[15px] font-medium">5.5 Нэгжийн хариуцлага</h3>
-        <p className="text-[14px] text-ink2">
-          Хүсэлтийн агуулга нууц боловч нэгж бүрийн{" "}
-          <strong className="font-medium text-ink">
-            хүлээн авсан тоо, хугацаандаа хариулсан хувь, дундаж хугацаа, сэтгэл ханамж, хоцорсон
-            хүсэлтийн тоо
-          </strong>{" "}
-          «Санал, гомдол» хуудсанд нийтэд ил харагдана. Нэгжийн дотоод тэмдэглэл илгээгчид
-          харагдахгүй ч аудит логт бүх үйлдэл бүртгэгдэнэ.
+        <p>
+          Гишүүн бүр санаачилгыг <strong>нэг л удаа</strong> дэмжинэ. Давхардлыг SSO танигчаар
+          болон өгөгдлийн сангийн давтагдашгүй хязгаарлалтаар хоёр түвшинд хаана. Хамрах
+          хүрээнээс гадуурх гишүүн дэмжих боломжгүй.
         </p>
-      </section>
+      </Section>
 
-      {/* ── Нууцлал ── */}
-      <section id="privacy" className="space-y-4">
-        <h2 className="text-[19px] font-medium">6. Нууцлалын бодлого</h2>
-        <div className="card overflow-x-auto">
-          <table className="data">
+      <Section id="calendar" title="Хичээлийн хуанли ба зогсолт">
+        <p>
+          Дотоод журмын хугацаа — дэмжлэг цуглуулах {deadlines.collectDays} хоног, босго давснаас
+          хойш хариу өгөх {deadlines.initiativeResponseDays} хоног — нь{" "}
+          <strong>хичээлийн өдрөөр</strong> тоологдоно: амралтын үеүдийг алгасна. Ингэснээр
+          оюутнууд байхгүй үед дэмжлэгийн хугацаа «шатахаас» сэргийлнэ.
+        </p>
+        <p>
+          Хариу өгөх хугацааны хуанлийн нийт хоног {deadlines.maxResponseCalendarDays}-аас
+          хэтэрвэл тэрхүү хуулийн дээд хязгаараар хязгаарлана.
+        </p>
+        {breaks.length > 0 && (
+          <div className="space-y-1">
+            <p className="font-medium text-ink">Бүртгэгдсэн амралтын үеүд:</p>
+            {breaks.map((b) => (
+              <div key={b.name + b.startsOn} className="flex justify-between text-[14px]">
+                <span>{b.name}</span>
+                <span className="tabular-nums text-ink3">
+                  {b.startsOn} … {b.endsOn}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section id="routing" title="Хүсэлт чиглүүлэх">
+        <p>
+          Хэрэглэгч хариуцсан нэгжийг <strong>өөрөө сонгохгүй</strong> — зөвхөн ангилал сонгоно.
+          Систем «ангилал → нэгж» хүснэгтийн дагуу автоматаар чиглүүлнэ. Нэгж тохируулаагүй
+          ангиллын хүсэлтийг модератор гараар чиглүүлнэ.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[14px]">
             <thead>
-              <tr>
-                <th>Мэдээлэл</th>
-                <th>Хэн харах вэ</th>
+              <tr className="text-left text-ink3 text-[13px]">
+                <th className="py-2 pr-3 font-normal">Ангилал</th>
+                <th className="py-2 pl-3 font-normal">Хариуцах нэгж</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>Санал өгсөн эсэх</td>
-                <td className="text-ink2">Зөвхөн та өөрөө. Нийтэд зөвхөн нэгдсэн тоо харагдана.</td>
-              </tr>
-              <tr>
-                <td>Юу гэж санал өгсөн</td>
-                <td className="text-ink2">
-                  Хэн ч харахгүй. Аудит логт хүртэл саналын утга бичигдэхгүй.
-                </td>
-              </tr>
-              <tr>
-                <td>Нэр (дэмжигчдийн жагсаалтад)</td>
-                <td className="text-ink2">
-                  Зөвхөн та өөрөө «нэрээ харуулах» гэж сонгосон тохиолдолд.
-                </td>
-              </tr>
-              <tr>
-                <td>Сэтгэгдэл</td>
-                <td className="text-ink2">Нэр, бүлэг, салбар (курс эсвэл албан тушаал)-тай хамт нийтэд харагдана.</td>
-              </tr>
-              <tr>
-                <td>Санал, гомдлын агуулга</td>
-                <td className="text-ink2">
-                  Зөвхөн та, хариуцах нэгжийн хариуцагч, системийн админ. Нийтэд зөвхөн нэгжийн
-                  нэгдсэн тоон үзүүлэлт харагдана.
-                </td>
-              </tr>
-              <tr>
-                <td>Нэрээ нууцалсан санал, гомдлын илгээгч</td>
-                <td className="text-ink2">
-                  Хэн ч харахгүй — нэр, харьяалал хадгалагдахгүй. Хариуг танд хүргэхийн тулд
-                  зөвхөн бүртгэлийн холбоос хадгалагдана.
-                </td>
-              </tr>
-              <tr>
-                <td>Оюутны код, ажилтны дугаар, и-мэйл</td>
-                <td className="text-ink2">Нийтэд хэзээ ч харагдахгүй. Зөвхөн нэвтрэлтэд ашиглана.</td>
-              </tr>
+              {categories.map((c) => (
+                <tr key={c.id} className="border-t border-line">
+                  <td className="py-1.5 pr-3">{c.name}</td>
+                  <td className="py-1.5 pl-3 text-ink3">
+                    {c.unit?.name ?? "модератор гараар чиглүүлнэ"}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-        <p className="text-[14px] text-ink2">
-          Хэрэглэгч бүртгэлээс хасагдсан тохиолдолд түүний өгсөн санал{" "}
-          <strong className="font-medium text-ink">нэргүйжиж хадгалагдана</strong> — өнгөрсөн
-          санал хураалтын үр дүн хойшид өөрчлөгдөх ёсгүй.
+        <p>
+          Хариуцсан нэгж өөрт хамааралгүй хүсэлтийг шалтгаантайгаар буцаана. Буцаасан хүсэлт
+          модераторт очиж дахин чиглүүлэгдэнэ — хугацаа ЗОГСОХГҮЙ.
         </p>
-        <p className="text-[14px] text-ink2">
-          Систем нь Монгол Улсын «Хүний хувийн мэдээлэл хамгаалах тухай» хуулийн шаардлагад
-          нийцүүлэн боловсруулагдсан.
+      </Section>
+
+      <Section id="moderation" title="Модерацийн журам">
+        <p>
+          Модератор шинэ санаачилгыг нийтэд нээхээс өмнө агуулгын дүрэмд нийцэж байгаа эсэхийг{" "}
+          {moderation.reviewHours} цагийн дотор хянана. Татгалзах шалтгаан нь{" "}
+          <strong>урьдчилан нийтлэгдсэн</strong> жагсаалтаас сонгогдоно:
         </p>
-      </section>
-
-      {/* ── Гомдол ── */}
-      <section id="appeal" className="space-y-4">
-        <h2 className="text-[19px] font-medium">7. Шийдвэрийг давж заалдах журам</h2>
-        <ol className="text-[14px] text-ink2 space-y-1.5 list-decimal pl-5">
-          <li>
-            Модераторын буцаасан шийдвэрийг эс зөвшөөрвөл 14 хоногийн дотор Оюутны холбооны
-            хяналтын хороонд гомдол гаргана.
-          </li>
-          <li>
-            Зөвлөлийн татгалзсан шийдвэрийг эс зөвшөөрвөл санаачлагч нэмэлт баримттайгаар
-            дахин хэлэлцүүлэх хүсэлт гаргах эрхтэй.
-          </li>
-          <li>
-            Гомдлын хариуг 10 ажлын өдрийн дотор бичгээр өгнө. Хариу нь санаачилгын хуудсанд
-            хавсаргагдана.
-          </li>
-        </ol>
-      </section>
-
-      {/* ── Хориотой ── */}
-      <section id="terms" className="space-y-4">
-        <h2 className="text-[19px] font-medium">8. Үйлчилгээний нөхцөл</h2>
-        <ul className="text-[14px] text-ink2 space-y-1.5 list-disc pl-5">
-          <li>Системд зөвхөн сургуулийн бүртгэлтэй, идэвхтэй оюутан, багш, ажилтан нэвтэрнэ.</li>
-          <li>
-            Өөр хүний нэрийн өмнөөс нэвтрэх, санал өгөх нь сургуулийн дотоод журмын зөрчилд
-            тооцогдоно.
-          </li>
-          <li>Автоматжуулсан хэрэгслээр олноор санал өгөх, бүртгэл үүсгэхийг хориглоно.</li>
-          <li>
-            Системийг арилжааны сурталчилгаа, улс төрийн кампанит ажилд ашиглахыг хориглоно.
-          </li>
-          <li>
-            Зөрчил гаргасан хэрэглэгчийн эрхийг хугацаатай түдгэлзүүлэх эсвэл хаах шийдвэрийг
-            Оюутны холбооны хяналтын хороо гаргана.
-          </li>
+        <ul className="space-y-1 list-disc pl-5">
+          {Object.values(REJECTION_REASONS).map((r) => (
+            <li key={r}>{r}</li>
+          ))}
         </ul>
-      </section>
+        <Notice tone="gray" title="Модераторын эрхийн хязгаар">
+          Модератор <strong>босгын тоо, хугацааг гараар өөрчлөх эрхгүй</strong>. Зөвхөн хамрах
+          хүрээг шалтгаантайгаар засч чадна, тэр ч хяналтын шатанд л боломжтой. Татгалзах, нуух,
+          хамрах хүрээ засах, дахин чиглүүлэх үйлдэл бүрт шалтгаан заавал бичигдэж, аудитын
+          бүртгэлд устгагдахгүйгээр хадгалагдана. Шалтгаан нь санаачлагчид харагдана.
+        </Notice>
+        <p>
+          Татгалзах, буцаах тайлбар дор хаяж {moderation.reasonMinChars} тэмдэгт, албан хариу дор
+          хаяж {moderation.responseMinChars} тэмдэгт байх ёстой — «Шийдэгдлээ» гэсэн ганц үг
+          хүлээн авахгүй.
+        </p>
+      </Section>
+
+      <Section id="privacy" title="Нууцлалын бодлого">
+        <ul className="space-y-1.5 list-disc pl-5">
+          <li>
+            Хувийн мэдээллийг «Хүний хувийн мэдээлэл хамгаалах тухай хууль»-д нийцүүлэн
+            боловсруулна. Анх нэвтрэхэд зөвшөөрөл авна.
+          </li>
+          <li>
+            <strong>Дэмжигчдийн нэрсийг нийтэд харуулахгүй</strong> — зөвхөн нийт тоо
+            харагдана.
+          </li>
+          <li>
+            Хаалттай сувгийн санал, гомдлыг зөвхөн гаргагч, хариуцсан нэгж, модератор харна.
+            Эрхгүй хандалтад сервер 403 алдаа буцаана.
+          </li>
+          <li>
+            Нэрээ нууцлах сонголт хийсэн тохиолдолд хариуцагчид илгээгчийн нэр харагдахгүй.
+            Хариу нь илгээгчид хэвээр хүрнэ.
+          </li>
+          <li>Бүх холболт HTTPS; сесс httpOnly, Secure cookie-д хадгалагдана.</li>
+        </ul>
+      </Section>
+
+      <Section id="appeal" title="Давж заалдах">
+        <p>
+          Модераторын шийдвэртэй санал нийлэхгүй бол санаачлагч тайлбарыг үндэслэн засварлаж
+          дахин илгээх эрхтэй. Нэгжийн албан хариу хангалтгүй гэж үзвэл гаргагч хүсэлтээ нийтийн
+          санаачилга болгон хөрвүүлж, бусад гишүүдийн дэмжлэгээр асуудлыг дахин хөндөж болно.
+        </p>
+        <p>
+          Хугацаа хэтэрсэн бүх хүсэлт нийтийн статистикт ил харагдана — хариуцлагын механизм нь
+          ил тод байдал дээр суурилна.
+        </p>
+      </Section>
     </div>
   );
 }

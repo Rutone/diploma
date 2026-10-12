@@ -1,217 +1,308 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { currentUser } from "@/lib/auth";
-import { all } from "@/lib/db";
-import { moderationQueue, syncLifecycle, stats } from "@/lib/repo";
-import { Empty, Notice, StatusBadge } from "@/components/ui";
-import { fmtDateTime, relative, remaining } from "@/lib/format";
-import { POLICY } from "@/lib/policy";
-import { addDays } from "@/lib/format";
-import { feedbackTotals } from "@/lib/feedback";
+import { prisma } from "@/lib/prisma";
+import { can, currentUser } from "@/lib/auth/session";
+import { getDeadlineParams, getThresholdParams } from "@/lib/settings";
+import { computeThreshold } from "@/lib/rules/threshold";
+import { dbDateToCivil } from "@/lib/rules/dates";
+import { ROLES } from "@/lib/labels";
+import { Notice, StatTile } from "@/components/ui";
+import {
+  BreakForm,
+  CategoryForm,
+  DeadlineForm,
+  RoleForm,
+  ThresholdForm,
+  TimerButton,
+} from "./AdminForms";
+import { removeBreak, toggleCategory, updateCategoryUnit } from "./actions";
+import { fmtDateTime, fmtNum } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Админ самбар — NFR-13.
+ *
+ * «Босго, хугацаа, ангилал–нэгж, хуанли зэрэг бодлогын утгыг код
+ * өөрчлөхгүйгээр админ самбараас тохируулна.» Энэ хуудас уг шаардлагыг
+ * бүрэн хангана: FR-23 (ангилал–нэгж), FR-24 (параметр), FR-25 (хуанли),
+ * FR-26 (эрх), FR-27 (цаг хэмжигч).
+ */
 export default async function AdminPage() {
-  syncLifecycle();
   const user = await currentUser();
-  if (!user) redirect("/login");
-  if (user.role !== "MODERATOR" && user.role !== "ADMIN") {
-    return <Notice tone="amber">Энэ хуудсыг үзэх эрх танд байхгүй байна.</Notice>;
+  if (!user) redirect("/auth/login");
+  if (!can(user, "ADMIN")) {
+    return (
+      <Notice tone="red" title="Эрх хүрэхгүй байна">
+        Энэ хуудас зөвхөн системийн админд зориулагдсан.
+      </Notice>
+    );
   }
 
-  const queue = moderationQueue();
-  const s = stats();
-  const fb = feedbackTotals();
+  const [threshold, deadlines, categories, units, breaks, audit, counts, staff, members] =
+    await Promise.all([
+      getThresholdParams(),
+      getDeadlineParams(),
+      prisma.category.findMany({ include: { unit: true }, orderBy: { sortOrder: "asc" } }),
+      prisma.unit.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+      prisma.academicBreak.findMany({ orderBy: { startsOn: "asc" } }),
+      prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 25 }),
+      Promise.all([
+        prisma.initiative.count(),
+        prisma.request.count(),
+        prisma.support.count(),
+        prisma.notification.count(),
+      ]),
+      prisma.user.findMany({
+        where: { role: { in: ["UNIT_STAFF", "MODERATOR", "ADMIN"] } },
+        include: { unit: true },
+        orderBy: [{ role: "asc" }, { name: "asc" }],
+      }),
+      prisma.user.count({ where: { active: true } }),
+    ]);
 
-  const flagged = all<{
-    id: number; body: string; author_name: string; initiative_id: number;
-    hidden_at: string | null; n: number; title: string;
-  }>(
-    `SELECT c.id, c.body, c.author_name, c.initiative_id, c.hidden_at,
-            COUNT(r.comment_id) n, i.title
-     FROM comments c
-     JOIN comment_reports r ON r.comment_id = c.id
-     JOIN initiatives i ON i.id = c.initiative_id
-     WHERE c.deleted_at IS NULL
-     GROUP BY c.id
-     ORDER BY n DESC, c.id DESC
-     LIMIT 20`
-  );
-
-  const log = all<{
-    id: number; actor_name: string; action: string; entity: string;
-    entity_id: number | null; detail: string; created_at: string;
-  }>(`SELECT * FROM audit_log ORDER BY id DESC LIMIT 40`);
+  const [initiativeCount, requestCount, supportCount, notificationCount] = counts;
+  const lastTimer = audit.find((a) => a.action === "DAILY_CHECK");
 
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-[14.5px] text-ink2">
-          Журмын дагуу санаачилга бүрийг {POLICY.MODERATION_HOURS} цагийн дотор шийдэх
-          үүрэгтэй. Буцаах шалтгааныг урьдчилан нийтлэгдсэн жагсаалтаас л сонгоно.
-        </p>
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <StatTile label="Гишүүн" value={members} tone="blue" />
+        <StatTile label="Санаачилга" value={initiativeCount} />
+        <StatTile label="Дэмжлэг" value={supportCount} tone="green" />
+        <StatTile label="Санал, гомдол" value={requestCount} />
+        <StatTile label="Мэдэгдэл" value={notificationCount} />
       </div>
 
-      <section>
-        <h2 className="text-[16px] font-medium mb-3">
-          Хяналт хүлээж буй <span className="text-ink3 font-normal">({queue.length})</span>
-        </h2>
-        {queue.length === 0 ? (
-          <Empty text="Хяналт хүлээж буй санаачилга байхгүй байна." />
-        ) : (
-          <div className="grid gap-3">
-            {queue.map((c) => {
-              const due = c.submitted_at
-                ? addDays(new Date(c.submitted_at), POLICY.MODERATION_HOURS / 24).toISOString()
-                : null;
-              const r = due ? remaining(due) : null;
-              return (
-                <Link key={c.id} href={`/initiatives/${c.id}`} className="card block p-4 hover:border-line2">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <StatusBadge status={c.status} />
-                    <span className="badge badge-gray">{c.endorsements} урьдчилсан дэмжигч</span>
-                    {r && (
-                      <span className={`badge ${r.overdue ? "badge-red" : "badge-gray"} ml-auto`}>
-                        {r.text}
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="text-[16px] font-medium mb-1">{c.title}</h3>
-                  <p className="text-[14px] text-ink2 line-clamp-2">{c.summary}</p>
-                  <p className="text-[12.5px] text-ink3 mt-2">
-                    {c.author_name} · илгээсэн {relative(c.submitted_at)}
-                  </p>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </section>
+      {/* ── FR-24: босго ── */}
+      <section className="card p-4 sm:p-5 space-y-4">
+        <div>
+          <h3 className="sec-title">Дэмжлэгийн босгын параметр</h3>
+          <p className="hint mt-1">
+            B = ⌈max(p·N, min(T_min, q·N))⌉ · Өөрчлөлт нь ШИНЭЭР батлагдах санаачилгад үйлчилнэ.
+            Нийтлэгдсэн санаачилгын босго хөлдсөн тул хөдлөхгүй.
+          </p>
+        </div>
 
-      <section>
-        <h2 className="text-[16px] font-medium mb-3">
-          Мэдээлэгдсэн сэтгэгдэл <span className="text-ink3 font-normal">({flagged.length})</span>
-        </h2>
-        <p className="text-[13.5px] text-ink3 mb-3">
-          {POLICY.REPORTS_TO_HIDE} ба түүнээс дээш мэдээлэл ирсэн сэтгэгдэл автоматаар нуугдана.
-        </p>
-        {flagged.length === 0 ? (
-          <Empty text="Мэдээлэгдсэн сэтгэгдэл байхгүй." />
-        ) : (
-          <div className="card overflow-x-auto">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>Сэтгэгдэл</th>
-                  <th>Зохиогч</th>
-                  <th>Мэдээлэл</th>
-                  <th>Төлөв</th>
-                </tr>
-              </thead>
-              <tbody>
-                {flagged.map((f) => (
-                  <tr key={f.id}>
-                    <td className="max-w-[380px]">
-                      <div className="line-clamp-2">{f.body}</div>
-                      <Link href={`/initiatives/${f.initiative_id}`} className="link text-[12.5px]">
-                        {f.title}
-                      </Link>
-                    </td>
-                    <td>{f.author_name}</td>
-                    <td className="tabular-nums">{f.n}</td>
-                    <td>
-                      {f.hidden_at ? (
-                        <span className="badge badge-red">Нуугдсан</span>
-                      ) : (
-                        <span className="badge badge-gray">Харагдаж буй</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+        <ThresholdForm p={threshold.p} tMin={threshold.tMin} q={threshold.q} />
 
-      <section>
-        <h2 className="text-[16px] font-medium mb-1">Аудит лог</h2>
-        <p className="text-[13.5px] text-ink3 mb-3">
-          Удирдлагын бүх үйлдэл бүртгэгдэнэ. Дэмжлэгийн тоог гараар өөрчлөх боломжгүй —
-          санал зөвхөн санал өгөгчийн өөрийн үйлдлээр нэмэгдэнэ. Аудит логт саналын утга
-          бичигдэхгүй.
-        </p>
-        <div className="card overflow-x-auto">
-          <table className="data">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[14px]">
             <thead>
-              <tr>
-                <th>Хэзээ</th>
-                <th>Хэн</th>
-                <th>Үйлдэл</th>
-                <th>Обьект</th>
-                <th>Тайлбар</th>
+              <tr className="text-left text-ink3 text-[13px]">
+                <th className="py-2 pr-3 font-normal">Хамрах хүрээний хэмжээ (N)</th>
+                <th className="py-2 px-3 font-normal text-right">Босго (B)</th>
+                <th className="py-2 pl-3 font-normal text-right">B / N</th>
               </tr>
             </thead>
             <tbody>
-              {log.map((l) => (
-                <tr key={l.id}>
-                  <td className="whitespace-nowrap text-ink3">{fmtDateTime(l.created_at)}</td>
-                  <td className="whitespace-nowrap">{l.actor_name}</td>
-                  <td>
-                    <code className="text-[12.5px]">{l.action}</code>
-                  </td>
-                  <td className="text-ink3">
-                    {l.entity_id && l.entity === "initiative" ? (
-                      <Link href={`/initiatives/${l.entity_id}`} className="link">
-                        #{l.entity_id}
-                      </Link>
-                    ) : l.entity_id && l.entity === "feedback" && user.role === "ADMIN" ? (
-                      <Link href={`/feedback/${l.entity_id}`} className="link">
-                        хүсэлт #{l.entity_id}
-                      </Link>
-                    ) : (
-                      <span>{l.entity}{l.entity_id ? ` #${l.entity_id}` : ""}</span>
-                    )}
-                  </td>
-                  <td className="text-ink2">{l.detail}</td>
-                </tr>
-              ))}
+              {[members, 2811, 1091, 335, 45, 23].map((n) => {
+                const b = computeThreshold(n, threshold);
+                return (
+                  <tr key={n} className="border-t border-line">
+                    <td className="py-1.5 pr-3 tabular-nums">{fmtNum(n)}</td>
+                    <td className="py-1.5 px-3 text-right tabular-nums">{b}</td>
+                    <td className="py-1.5 pl-3 text-right tabular-nums text-ink3">
+                      {((b / n) * 100).toFixed(1)}%
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </section>
 
-      <section className="card p-5">
-        <h2 className="text-[15px] font-medium mb-3">Системийн үзүүлэлт</h2>
-        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[14px]">
-          <Item label="Идэвхтэй гишүүн" v={s.members} />
-          <Item label="Нийт санал" v={s.votes} />
-          <Item label="Санал өгсөн хүн" v={s.voters} />
-          <Item label="Идэвхтэй санал хураалт" v={s.active} />
-          <Item label="Зөвлөлд хүлээгдэж буй" v={s.council} />
-          <Item label="Хариу хоцорсон" v={s.overdue} danger={s.overdue > 0} />
-          <Item label="Хэрэгжиж буй" v={s.inProgress} />
-          <Item label="Хэрэгжсэн" v={s.completed} />
-          <Item label="Санал, гомдол" v={fb.received} />
-          <Item label="Шийдвэрлэгдэж буй" v={fb.open} />
-          <Item label="Санал, гомдол хоцорсон" v={fb.overdue} danger={fb.overdue > 0} />
-          <Item label="Хугацаандаа хариулсан %" v={fb.onTimePct ?? 0} />
-        </dl>
+      {/* ── FR-24: хугацаа ── */}
+      <section className="card p-4 sm:p-5 space-y-4">
+        <div>
+          <h3 className="sec-title">Хугацааны параметр</h3>
+          <p className="hint mt-1">
+            Хуулийн хугацааг (гомдол 30, санал 90) дээд хязгаараас нь хэтрүүлэх боломжгүй —
+            систем татгалзана.
+          </p>
+        </div>
+        <DeadlineForm values={deadlines} />
       </section>
-    </div>
-  );
-}
 
-function Item({ label, v, danger }: { label: string; v: number; danger?: boolean }) {
-  return (
-    <div>
-      <dt className="text-[12.5px] text-ink3">{label}</dt>
-      <dd
-        className="text-[20px] font-medium tabular-nums"
-        style={{ color: danger ? "var(--bad)" : undefined }}
-      >
-        {v}
-      </dd>
+      {/* ── FR-23: ангилал → нэгж ── */}
+      <section className="card p-4 sm:p-5 space-y-4">
+        <div>
+          <h3 className="sec-title">Ангилал → хариуцах нэгж</h3>
+          <p className="hint mt-1">
+            Хэрэглэгч нэгжийг сонгохгүй — зөвхөн ангилал сонгоно. Нэгж тохируулаагүй ангиллын
+            хүсэлт модераторт очиж гараар чиглүүлэгдэнэ.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-[14px]">
+            <thead>
+              <tr className="text-left text-ink3 text-[13px]">
+                <th className="py-2 pr-3 font-normal">Ангилал</th>
+                <th className="py-2 px-3 font-normal">Хариуцах нэгж</th>
+                <th className="py-2 pl-3 font-normal text-right">Төлөв</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map((c) => (
+                <tr key={c.id} className="border-t border-line">
+                  <td className="py-2 pr-3">
+                    <div className={c.active ? "" : "text-ink3 line-through"}>{c.name}</div>
+                    <div className="hint">{c.code}</div>
+                  </td>
+                  <td className="py-2 px-3">
+                    <form action={updateCategoryUnit} className="flex gap-2">
+                      <input type="hidden" name="categoryId" value={c.id} />
+                      <select
+                        name="unitId"
+                        className="input"
+                        style={{ maxWidth: 280 }}
+                        defaultValue={c.unitId ?? ""}
+                      >
+                        <option value="">— модераторт —</option>
+                        {units.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button type="submit" className="btn btn-ghost btn-sm">
+                        Хадгалах
+                      </button>
+                    </form>
+                  </td>
+                  <td className="py-2 pl-3 text-right">
+                    <form action={toggleCategory}>
+                      <input type="hidden" name="categoryId" value={c.id} />
+                      <button type="submit" className="btn btn-ghost btn-sm">
+                        {c.active ? "Идэвхгүй болгох" : "Идэвхжүүлэх"}
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <details>
+          <summary className="text-[14px] cursor-pointer text-ink2">Шинэ ангилал нэмэх</summary>
+          <div className="mt-3">
+            <CategoryForm units={units.map((u) => ({ id: u.id, name: u.name }))} />
+          </div>
+        </details>
+      </section>
+
+      {/* ── FR-25: хичээлийн хуанли ── */}
+      <section className="card p-4 sm:p-5 space-y-4">
+        <div>
+          <h3 className="sec-title">Хичээлийн амралтын хуанли</h3>
+          <p className="hint mt-1">
+            Дотоод журмын хугацаа (дэмжлэг цуглуулах, санаачилгын хариу) эдгээр үеийг АЛГАСНА.
+            Хуулийн хугацаа (гомдол, санал) амралтаар ЗОГСОХГҮЙ.
+          </p>
+        </div>
+
+        {breaks.length === 0 ? (
+          <p className="text-[14px] text-ink3">Амралтын үе бүртгэгдээгүй байна.</p>
+        ) : (
+          <div className="space-y-2">
+            {breaks.map((b) => (
+              <div
+                key={b.id}
+                className="flex items-center justify-between gap-3 py-2 border-b border-line last:border-0"
+              >
+                <div>
+                  <div className="text-[14px] font-medium">{b.name}</div>
+                  <div className="hint tabular-nums">
+                    {dbDateToCivil(b.startsOn)} … {dbDateToCivil(b.endsOn)}
+                  </div>
+                </div>
+                <form action={removeBreak}>
+                  <input type="hidden" name="breakId" value={b.id} />
+                  <button type="submit" className="btn btn-ghost btn-sm">
+                    Устгах
+                  </button>
+                </form>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <BreakForm />
+      </section>
+
+      {/* ── FR-26: эрх ── */}
+      <section className="card p-4 sm:p-5 space-y-4">
+        <div>
+          <h3 className="sec-title">Хэрэглэгчийн эрх</h3>
+          <p className="hint mt-1">
+            Эрх олгох, хасах бүр аудитын бүртгэлд хадгалагдана. Өөрийн админ эрхийг хасах
+            боломжгүй.
+          </p>
+        </div>
+
+        <RoleForm units={units.map((u) => ({ id: u.id, name: u.name }))} />
+
+        <div className="space-y-1.5">
+          {staff.map((s) => (
+            <div
+              key={s.id}
+              className="flex items-center justify-between gap-3 py-1.5 border-b border-line last:border-0"
+            >
+              <div className="text-[14px]">{s.name}</div>
+              <div className="text-[13px] text-ink3">
+                {ROLES[s.role].label}
+                {s.unit ? ` · ${s.unit.name}` : ""} · <span className="tabular-nums">{s.code}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── FR-27: цаг хэмжигч ── */}
+      <section className="card p-4 sm:p-5 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="sec-title">Хугацаа шалгах цаг хэмжигч</h3>
+            <p className="hint mt-1">
+              Өдөр бүр 01:00 цагт автоматаар ажиллана: хугацаа хэтэрсэн хүсэлтийг тэмдэглэх, 3
+              хоногийн сануулга илгээх, цуглуулах хугацаа дууссан санаачилгыг хаах, амралтын
+              «Түр зогссон» төлвийг тавих.
+            </p>
+            {lastTimer && (
+              <p className="hint mt-1">
+                Сүүлд ажилласан: {fmtDateTime(lastTimer.createdAt.toISOString())}
+              </p>
+            )}
+          </div>
+          <TimerButton />
+        </div>
+      </section>
+
+      {/* ── NFR-07: аудит ── */}
+      <section className="card p-4 sm:p-5">
+        <h3 className="sec-title mb-3">Аудитын бүртгэл</h3>
+        <p className="hint mb-3">
+          Тохиргоо, эрхийн өөрчлөлт зэрэг удирдлагын үйлдлүүд. Төлөвийн өөрчлөлт нь тухайн
+          хүсэлтийн түүхэнд тусад нь бүртгэгдэнэ.
+        </p>
+        <div className="space-y-1.5">
+          {audit.map((a) => (
+            <div key={a.id} className="py-1.5 border-b border-line last:border-0">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-[13px] font-medium">{a.action}</span>
+                <span className="text-[12.5px] text-ink3">
+                  {a.actorLabel} · {fmtDateTime(a.createdAt.toISOString())}
+                </span>
+              </div>
+              {a.detail && (
+                <p className="text-[13px] text-ink2 mt-0.5 break-words">{a.detail}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

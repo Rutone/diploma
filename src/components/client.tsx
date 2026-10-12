@@ -1,41 +1,54 @@
 "use client";
 
-import { useActionState, useState, useSyncExternalStore } from "react";
+import { useActionState, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
-import { VOTE_OPTIONS, POLICY, COMMENT_REPORT_REASONS, REJECTION_REASONS } from "@/lib/policy";
-import { castVote, addComment, councilDecide, moderateReturn, moderateApprove, addProgress, resubmit, reportComment } from "@/app/actions";
+import { COMMENT_REPORT_REASONS, REJECTION_REASONS, RESPONSE_OUTCOMES, RATINGS } from "@/lib/labels";
+import {
+  addComment,
+  closeRequest,
+  moderateApprove,
+  moderateReject,
+  moderateRoute,
+  reportComment,
+  submitRequest,
+  supportInitiative,
+  unitAnswerInitiative,
+  unitAnswerRequest,
+  unitExtendRequest,
+  unitReturnRequest,
+  type ActionResult,
+} from "@/app/actions";
 
-/* ── Илгээх товч (ачаалж буй төлөвтэй) ─────────────────────────── */
+/* ═══ Нийтлэг жижиг хэсгүүд ══════════════════════════════════════ */
+
 export function Submit({
   children,
   className = "btn btn-primary",
   disabled,
+  pendingText = "Түр хүлээнэ үү…",
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
   disabled?: boolean;
+  pendingText?: string;
 }) {
   const { pending } = useFormStatus();
   return (
     <button type="submit" className={className} disabled={pending || disabled}>
-      {pending ? "Түр хүлээнэ үү…" : children}
+      {pending ? pendingText : children}
     </button>
   );
 }
 
-/* ── Бодит цагийн тоолуур ──────────────────────────────────────── */
 function subscribeToClock(onTick: () => void) {
   const t = setInterval(onTick, 1000);
   return () => clearInterval(t);
 }
-// Секундээр бөөрөнхийлсөн тул нэг секундын дотор утга тогтвортой байна.
 const clockSnapshot = () => Math.floor(Date.now() / 1000) * 1000;
 const serverSnapshot = () => null;
 
 export function Countdown({ iso, prefix = "" }: { iso: string; prefix?: string }) {
   const now = useSyncExternalStore(subscribeToClock, clockSnapshot, serverSnapshot);
-
-  // Серверийн рендерт цаг тодорхойгүй — гидрацийн зөрүү гаргахгүйн тулд хоосон.
   if (now === null) return <span className="tabular-nums text-ink3">…</span>;
 
   const ms = new Date(iso).getTime() - now;
@@ -45,9 +58,7 @@ export function Countdown({ iso, prefix = "" }: { iso: string; prefix?: string }
   const h = Math.floor((abs % 86400000) / 3600000);
   const m = Math.floor((abs % 3600000) / 60000);
   const sec = Math.floor((abs % 60000) / 1000);
-
-  const parts =
-    d > 0 ? `${d} хоног ${h} цаг ${m} мин` : `${h} цаг ${m} мин ${sec} сек`;
+  const parts = d > 0 ? `${d} хоног ${h} цаг ${m} мин` : `${h} цаг ${m} мин ${sec} сек`;
 
   return (
     <span style={{ color: over ? "var(--bad)" : undefined }} className="tabular-nums">
@@ -57,231 +68,285 @@ export function Countdown({ iso, prefix = "" }: { iso: string; prefix?: string }
   );
 }
 
-/* ── Тэмдэгт тоолуур ───────────────────────────────────────────── */
 function Counter({ value, min, max }: { value: string; min?: number; max?: number }) {
   const n = value.length;
   const bad = (min !== undefined && n < min) || (max !== undefined && n > max);
   return (
-    <span className="text-[12.5px] tabular-nums" style={{ color: bad ? "var(--bad)" : "var(--ink-3)" }}>
+    <span
+      className="text-[12.5px] tabular-nums"
+      style={{ color: bad ? "var(--bad)" : "var(--ink-3)" }}
+    >
       {n}
       {max ? ` / ${max}` : min ? ` (доод тал нь ${min})` : ""}
     </span>
   );
 }
 
-function Err({ msg }: { msg?: string }) {
-  if (!msg) return null;
-  return (
-    <p className="text-[13.5px] mt-2" style={{ color: "var(--bad)" }} role="alert">
-      {msg}
-    </p>
-  );
+function Msg({ r }: { r: ActionResult | null }) {
+  if (!r) return null;
+  if (r.error)
+    return (
+      <p className="text-[13.5px] mt-2" style={{ color: "var(--bad)" }} role="alert">
+        {r.error}
+      </p>
+    );
+  if (r.info)
+    return (
+      <p className="text-[13.5px] mt-2" style={{ color: "var(--ok)" }} role="status">
+        {r.info}
+      </p>
+    );
+  return null;
 }
 
-/* ═══ Санал өгөх маягт — баталгаажуулах алхамтай ══════════════════ */
-export function VoteForm({ initiativeId }: { initiativeId: number }) {
-  const [state, action] = useActionState(castVote, null as { ok: boolean; error?: string; info?: string } | null);
-  const [value, setValue] = useState<string>("");
-  const [confirming, setConfirming] = useState(false);
-  const [pub, setPub] = useState(false);
+/* ═══ Дэмжих — тайлангийн FR-12, 2.11.3 ══════════════════════════
+   Дэмжлэг нь ЭРГЭЖ БУЦААХГҮЙ үйлдэл тул баталгаажуулах алхамтай.   */
 
-  if (state?.ok) {
+export function SupportButton({
+  initiativeId,
+  supported,
+  disabledReason,
+}: {
+  initiativeId: number;
+  supported: boolean;
+  disabledReason: string | null;
+}) {
+  const [state, action] = useActionState<ActionResult | null, FormData>(supportInitiative, null);
+  const [confirming, setConfirming] = useState(false);
+
+  if (supported || state?.ok) {
     return (
-      <div className="card p-5" style={{ background: "var(--ok-soft)" }}>
-        <div className="font-medium mb-1" style={{ color: "var(--ok)" }}>
-          Таны санал бүртгэгдлээ
-        </div>
-        <p className="text-[14px]" style={{ color: "var(--ok)" }}>
-          Хугацаа дуусахад үр дүн нийтлэгдэнэ. Хуудсыг шинэчилж саналын тархалтыг харна уу.
+      <div className="card p-4" style={{ borderLeft: "3px solid var(--ok)" }}>
+        <p className="text-[14px] font-medium" style={{ color: "var(--ok)" }}>
+          Та энэ санаачилгыг дэмжсэн байна.
         </p>
+        <p className="hint mt-1">
+          Нэг хүн нэг удаа дэмжинэ. Таны нэр нийтэд харагдахгүй — зөвхөн тоо бүртгэгдэнэ.
+        </p>
+        <Msg r={state} />
       </div>
     );
   }
 
-  const chosen = VOTE_OPTIONS.find((o) => String(o.value) === value);
+  if (disabledReason) {
+    return (
+      <div className="card p-4">
+        <p className="text-[14px] text-ink2">{disabledReason}</p>
+      </div>
+    );
+  }
 
   return (
-    <form action={action} className="card p-4 sm:p-5">
+    <form action={action} className="card p-4">
       <input type="hidden" name="id" value={initiativeId} />
-      <input type="hidden" name="value" value={value} />
-      {pub && <input type="hidden" name="public" value="on" />}
-
       {!confirming ? (
-        <>
-          <h3 className="font-medium mb-1">Таны санал</h3>
-          <p className="hint mb-3.5" style={{ marginTop: 0 }}>
-            Дэмжих эсэхээ сонгоно уу. Эсрэг санал оноог хасна — дэмжлэг ба эсэргүүцэл
-            хоёулаа эцсийн үр дүнд тусна.
-          </p>
-
-          <div className="space-y-2">
-            {VOTE_OPTIONS.map((o) => (
-              <label key={o.value} className="vote-opt">
-                <input
-                  type="radio"
-                  name="pick"
-                  checked={value === String(o.value)}
-                  onChange={() => setValue(String(o.value))}
-                />
-                <span className="flex-1">{o.label}</span>
-                <span className="text-[13px] text-ink3 tabular-nums">
-                  {o.weight > 0 ? `+${o.weight}` : o.weight}
-                </span>
-              </label>
-            ))}
-          </div>
-
-          <label className="flex items-start gap-2.5 mt-4 text-[14px] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={pub}
-              onChange={(e) => setPub(e.target.checked)}
-              className="mt-1"
-              style={{ accentColor: "var(--brand)", width: 16, height: 16 }}
-            />
-            <span>
-              Нэрээ олон нийтэд харуулах
-              <span className="block text-[12.5px] text-ink3">
-                Тэмдэглээгүй бол таны нэр хэнд ч харагдахгүй. Саналын утга (юу сонгосон) нь
-                аль ч тохиолдолд нийтэд харагдахгүй.
-              </span>
-            </span>
-          </label>
-
-          <Err msg={state?.error} />
-
-          <button
-            type="button"
-            className="btn btn-primary w-full mt-4"
-            disabled={!value}
-            onClick={() => setConfirming(true)}
-          >
-            Үргэлжлүүлэх
-          </button>
-        </>
+        <button type="button" className="btn btn-primary w-full" onClick={() => setConfirming(true)}>
+          Энэ санаачилгыг дэмжих
+        </button>
       ) : (
         <>
-          <h3 className="font-medium mb-2">Баталгаажуулах</h3>
-          <div className="rounded-lg p-4 mb-3" style={{ background: "var(--warn-soft)" }}>
-            <p className="text-[14.5px]" style={{ color: "var(--warn)" }}>
-              Та <strong>«{chosen?.label}»</strong> гэж санал өгөх гэж байна.
-              {pub ? " Таны нэр дэмжигчдийн жагсаалтад харагдана." : " Таны нэр нийтэд харагдахгүй."}
-            </p>
-            <p className="text-[13.5px] mt-2" style={{ color: "var(--warn)" }}>
-              Илгээсний дараа өөрчлөх боломжгүй.
-            </p>
-          </div>
-          <Err msg={state?.error} />
+          <p className="text-[14px] text-ink2 mb-3 leading-relaxed">
+            Дэмжлэгээ буцаах боломжгүй. Та энэ санаачилгыг дэмжихдээ итгэлтэй байна уу?
+          </p>
           <div className="flex gap-2">
-            <button type="button" className="btn btn-ghost flex-1" onClick={() => setConfirming(false)}>
-              Буцах
+            <Submit className="btn btn-primary flex-1">Тийм, дэмжиж байна</Submit>
+            <button type="button" className="btn btn-ghost" onClick={() => setConfirming(false)}>
+              Болих
             </button>
-            <Submit className="btn btn-primary flex-1">Тийм, илгээх</Submit>
           </div>
         </>
       )}
+      <p className="hint mt-2">
+        Таны нэр нийтэд харагдахгүй. Давхардлыг SSO танигчаар шалгана.
+      </p>
+      <Msg r={state} />
     </form>
   );
 }
 
-/* ═══ Сэтгэгдэл бичих ════════════════════════════════════════════ */
-export function CommentForm({ initiativeId }: { initiativeId: number }) {
-  const [state, action] = useActionState(addComment, null as { ok: boolean; error?: string } | null);
+/* ═══ Санал, гомдол илгээх ═══════════════════════════════════════ */
+
+export function RequestForm({
+  categories,
+}: {
+  categories: { id: string; name: string; hint: string; unitName: string | null }[];
+}) {
+  const [state, action] = useActionState<ActionResult | null, FormData>(submitRequest, null);
+  const [kind, setKind] = useState<"SUGGESTION" | "COMPLAINT">("SUGGESTION");
+  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
+  const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
 
+  const chosen = categories.find((c) => c.id === categoryId);
+  const days = kind === "COMPLAINT" ? 30 : 90;
+
   return (
-    <form
-      action={(fd) => {
-        action(fd);
-        setBody("");
-      }}
-      className="card p-4"
-    >
-      <input type="hidden" name="id" value={initiativeId} />
-      <label className="label" htmlFor={`c-${initiativeId}`}>
-        Сэтгэгдэл бичих
-      </label>
-      <textarea
-        id={`c-${initiativeId}`}
-        name="body"
-        className="textarea"
-        rows={3}
-        maxLength={2000}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder="Санал болгож буй шийдлийн талаар байр сууриа бичнэ үү."
-      />
-      <div className="flex items-center justify-between gap-3 mt-2">
-        <span className="text-[12.5px] text-ink3">
-          Сэтгэгдэл нэрээр нийтлэгдэнэ. {POLICY.COMMENT_EDIT_MINUTES} минутын дотор устгаж болно.
-        </span>
-        <div className="flex items-center gap-3">
-          <Counter value={body} max={2000} />
-          <Submit className="btn btn-primary btn-sm">Илгээх</Submit>
+    <form action={action} className="space-y-5">
+      <div>
+        <label className="label">Юу илгээх вэ?</label>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {(["SUGGESTION", "COMPLAINT"] as const).map((k) => (
+            <label key={k} className={"choice"}>
+              <input
+                type="radio"
+                name="kind"
+                value={k}
+                checked={kind === k}
+                onChange={() => setKind(k)}
+              />
+              <div>
+                <div className="font-medium text-[14.5px]">
+                  {k === "SUGGESTION" ? "Санал" : "Гомдол"}
+                </div>
+                <div className="hint">
+                  {k === "SUGGESTION"
+                    ? "Үйл ажиллагааг сайжруулах санаа"
+                    : "Доголдол, журам зөрчсөн тохиолдол"}
+                </div>
+              </div>
+            </label>
+          ))}
         </div>
+        <p className="hint mt-2">
+          Хуулиар {kind === "COMPLAINT" ? "гомдлыг 30" : "саналыг 90"} хоногийн дотор
+          шийдвэрлэнэ.
+        </p>
       </div>
-      <Err msg={state?.error} />
+
+      <div>
+        <label className="label" htmlFor="categoryId">
+          Ангилал
+        </label>
+        <select
+          id="categoryId"
+          name="categoryId"
+          className="input"
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+          required
+        >
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        {chosen && (
+          <p className="hint mt-2">
+            {chosen.hint}
+            <br />
+            <strong>
+              {chosen.unitName
+                ? `Хариуцах нэгж: ${chosen.unitName}`
+                : "Хариуцах нэгжийг модератор тодорхойлно."}
+            </strong>{" "}
+            Хариу өгөх хугацаа: {days} хоног.
+          </p>
+        )}
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between">
+          <label className="label" htmlFor="title">
+            Гарчиг
+          </label>
+          <Counter value={title} min={10} max={120} />
+        </div>
+        <input
+          id="title"
+          name="title"
+          className="input"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          maxLength={120}
+          required
+          placeholder="Асуудлаа нэг өгүүлбэрээр"
+        />
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between">
+          <label className="label" htmlFor="body">
+            Дэлгэрэнгүй
+          </label>
+          <Counter value={body} min={40} max={4000} />
+        </div>
+        <textarea
+          id="body"
+          name="body"
+          className="textarea"
+          rows={10}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          maxLength={4000}
+          required
+          placeholder={
+            kind === "COMPLAINT"
+              ? "Юу болсон бэ? (хэзээ, хаана)\n\nТанд ямар хохирол, хүндрэл учирсан бэ?\n\nЯмар шийдэл хүлээж байна вэ?"
+              : "Одоо ямар байна вэ?\n\nЮуг яаж сайжруулахыг санал болгож байна вэ?\n\nЭнэ нь хэнд, ямар ач холбогдолтой вэ?"
+          }
+        />
+      </div>
+
+      <label className="flex items-start gap-2.5 text-[14px] text-ink2">
+        <input type="checkbox" name="anonymous" className="mt-0.5" />
+        <span>
+          Нэрээ нууцлах
+          <span className="hint block">
+            Хариуцагчид таны нэр харагдахгүй. Хариу танд хэвээр хүрнэ.
+          </span>
+        </span>
+      </label>
+
+      <div className="flex items-center gap-3">
+        <Submit>Илгээх</Submit>
+        <span className="hint">Илгээснээр бүртгэлийн дугаар олгоно.</span>
+      </div>
+      <Msg r={state} />
     </form>
   );
 }
 
-/* ═══ Сэтгэгдэл мэдээлэх ═════════════════════════════════════════ */
-export function ReportButton({ commentId, initiativeId }: { commentId: number; initiativeId: number }) {
-  const [open, setOpen] = useState(false);
-  if (!open)
-    return (
-      <button className="text-[12.5px] text-ink3 hover:underline" onClick={() => setOpen(true)}>
-        Мэдээлэх
-      </button>
-    );
-  return (
-    <form action={reportComment} className="flex flex-wrap items-center gap-2 mt-1.5">
-      <input type="hidden" name="commentId" value={commentId} />
-      <input type="hidden" name="id" value={initiativeId} />
-      <select name="reason" className="select" style={{ width: "auto", fontSize: 13, padding: "4px 8px" }}>
-        {Object.entries(COMMENT_REPORT_REASONS).map(([k, v]) => (
-          <option key={k} value={k}>
-            {v}
-          </option>
-        ))}
-      </select>
-      <Submit className="btn btn-ghost btn-sm">Илгээх</Submit>
-      <button type="button" className="text-[12.5px] text-ink3" onClick={() => setOpen(false)}>
-        Болих
-      </button>
-    </form>
-  );
-}
+/* ═══ Модерац ════════════════════════════════════════════════════ */
 
-/* ═══ Модерацийн маягт ═══════════════════════════════════════════ */
-export function ModerationForm({ initiativeId }: { initiativeId: number }) {
-  const [mode, setMode] = useState<"none" | "return">("none");
-  const [approve, approveAction] = useActionState(moderateApprove, null as { ok: boolean; error?: string } | null);
-  const [ret, returnAction] = useActionState(moderateReturn, null as { ok: boolean; error?: string } | null);
+export function ModerationForm({
+  initiativeId,
+  reasonMinChars,
+}: {
+  initiativeId: number;
+  reasonMinChars: number;
+}) {
+  const [approveState, approve] = useActionState<ActionResult | null, FormData>(moderateApprove, null);
+  const [rejectState, reject] = useActionState<ActionResult | null, FormData>(moderateReject, null);
+  const [mode, setMode] = useState<"none" | "reject">("none");
   const [note, setNote] = useState("");
 
-  if (approve?.ok || ret?.ok)
-    return <div className="text-[14px]" style={{ color: "var(--ok)" }}>Шийдвэр бүртгэгдлээ. Хуудсыг шинэчилнэ үү.</div>;
-
   return (
-    <div className="space-y-3">
+    <div className="card p-4 sm:p-5 space-y-4">
+      <h3 className="sec-title">Модераторын шийдвэр</h3>
+      <p className="hint">
+        Агуулгын дүрэм (доромжлол, хувийн мэдээлэл, давхардал) болон хамрах хүрээг шалгана. Босгын
+        тоог гараар өөрчлөх боломжгүй — батлах үед томьёогоор автоматаар тооцогдоно.
+      </p>
+
       {mode === "none" ? (
         <div className="flex flex-wrap gap-2">
-          <form action={approveAction}>
+          <form action={approve}>
             <input type="hidden" name="id" value={initiativeId} />
-            <Submit className="btn btn-primary">Нийтэлж, санал хураалт эхлүүлэх</Submit>
+            <Submit>Батлаж нийтлэх</Submit>
           </form>
-          <button className="btn btn-ghost" onClick={() => setMode("return")}>
-            Буцаах
+          <button type="button" className="btn btn-ghost" onClick={() => setMode("reject")}>
+            Татгалзах
           </button>
-          <Err msg={approve?.error} />
         </div>
       ) : (
-        <form action={returnAction} className="space-y-3">
+        <form action={reject} className="space-y-3">
           <input type="hidden" name="id" value={initiativeId} />
           <div>
-            <label className="label">Буцаах шалтгаан</label>
-            <select name="reason" className="select" required>
+            <label className="label" htmlFor="reasonCode">
+              Шалтгаан
+            </label>
+            <select id="reasonCode" name="reasonCode" className="input" required>
               <option value="">— сонгоно уу —</option>
               {Object.entries(REJECTION_REASONS).map(([k, v]) => (
                 <option key={k} value={k}>
@@ -289,226 +354,371 @@ export function ModerationForm({ initiativeId }: { initiativeId: number }) {
                 </option>
               ))}
             </select>
-            <p className="hint">
-              Зөвхөн урьдчилан нийтлэгдсэн жагсаалтаас сонгоно. Дурын шалтгаанаар буцаах
-              боломжгүй.
-            </p>
           </div>
           <div>
             <div className="flex items-center justify-between">
-              <label className="label">Зохиогчид өгөх тайлбар</label>
-              <Counter value={note} min={60} />
+              <label className="label" htmlFor="note">
+                Тайлбар
+              </label>
+              <Counter value={note} min={reasonMinChars} />
             </div>
             <textarea
+              id="note"
               name="note"
               className="textarea"
-              rows={5}
+              rows={4}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Юуг яаж засвал хүлээн авахаа тодорхой бичнэ үү."
+              placeholder="Зохиогч юуг яаж засахаа ойлгох ёстой."
             />
           </div>
-          <Err msg={ret?.error} />
           <div className="flex gap-2">
+            <Submit className="btn btn-danger">Татгалзаж буцаах</Submit>
             <button type="button" className="btn btn-ghost" onClick={() => setMode("none")}>
               Болих
             </button>
-            <Submit className="btn btn-danger">Буцаах</Submit>
           </div>
         </form>
       )}
+
+      <Msg r={approveState ?? rejectState} />
     </div>
   );
 }
 
-/* ═══ Зөвлөлийн шийдвэрийн маягт ═════════════════════════════════ */
-export function CouncilForm({
-  initiativeId,
-  stars,
+/* ═══ Нэгжийн албан хариу ════════════════════════════════════════ */
+
+export function AnswerForm({
+  id,
+  target,
+  minChars,
 }: {
-  initiativeId: number;
-  stars: number;
+  id: number;
+  target: "request" | "initiative";
+  minChars: number;
 }) {
-  const [state, action] = useActionState(councilDecide, null as { ok: boolean; error?: string; info?: string } | null);
-  const [decision, setDecision] = useState<"APPROVED" | "DECLINED" | "">("");
-  const [reasoning, setReasoning] = useState("");
-  const locked = stars >= 5;
-
-  if (state?.ok)
-    return <div className="text-[14px]" style={{ color: "var(--ok)" }}>{state.info}</div>;
-
-  return (
-    <form action={action} className="card p-4 sm:p-5 space-y-4">
-      <input type="hidden" name="id" value={initiativeId} />
-
-      {locked && (
-        <div className="rounded-lg p-3 text-[13.5px]" style={{ background: "var(--info-soft)", color: "var(--info)" }}>
-          Энэ санаачилга босгоос хоёр дахин давсан (★★★★★) тул зөвлөл хориг тавих эрхгүй.
-          Зөвхөн хэрэгжүүлэх төлөвлөгөөг баталгаажуулна.
-        </div>
-      )}
-
-      <div>
-        <label className="label">Шийдвэр</label>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <label className="vote-opt flex-1">
-            <input
-              type="radio"
-              name="decision"
-              value="APPROVED"
-              checked={decision === "APPROVED"}
-              onChange={() => setDecision("APPROVED")}
-            />
-            <span>Дэмжиж, хэрэгжүүлнэ</span>
-          </label>
-          <label className="vote-opt flex-1" style={{ opacity: locked ? 0.45 : 1 }}>
-            <input
-              type="radio"
-              name="decision"
-              value="DECLINED"
-              disabled={locked}
-              checked={decision === "DECLINED"}
-              onChange={() => setDecision("DECLINED")}
-            />
-            <span>Татгалзана</span>
-          </label>
-        </div>
-      </div>
-
-      {decision === "APPROVED" && (
-        <div className="grid sm:grid-cols-3 gap-3">
-          <div>
-            <label className="label">Хариуцах хүн</label>
-            <input name="assignee" className="input" placeholder="Овог нэр" required />
-          </div>
-          <div>
-            <label className="label">Нэгж</label>
-            <input name="unit" className="input" placeholder="Алба, хэлтэс" required />
-          </div>
-          <div>
-            <label className="label">Эцсийн хугацаа</label>
-            <input name="due" type="date" className="input" required />
-          </div>
-        </div>
-      )}
-
-      <div>
-        <div className="flex items-center justify-between">
-          <label className="label">Албан ёсны үндэслэл</label>
-          <Counter value={reasoning} min={POLICY.MIN_REASONING_CHARS} />
-        </div>
-        <textarea
-          name="reasoning"
-          className="textarea"
-          rows={8}
-          value={reasoning}
-          onChange={(e) => setReasoning(e.target.value)}
-          placeholder="Шийдвэрийн үндэслэлийг тодорхой бичнэ үү. Энэ текст нийтэд ил харагдана."
-        />
-        <p className="hint">
-          Хамгийн багадаа {POLICY.MIN_REASONING_CHARS} тэмдэгт. «Татгалзав» гэсэн ганц үг
-          хүлээн авахгүй — шийдвэр бүр үндэслэлтэй байх ёстой.
-        </p>
-      </div>
-
-      <Err msg={state?.error} />
-      <Submit className="btn btn-primary">Шийдвэрийг нийтлэх</Submit>
-    </form>
+  const [state, action] = useActionState<ActionResult | null, FormData>(
+    target === "request" ? unitAnswerRequest : unitAnswerInitiative,
+    null
   );
-}
-
-/* ═══ Явцын мэдээлэл ═════════════════════════════════════════════ */
-export function ProgressForm({ initiativeId }: { initiativeId: number }) {
-  const [state, action] = useActionState(addProgress, null as { ok: boolean; error?: string; info?: string } | null);
+  const [outcome, setOutcome] = useState<keyof typeof RESPONSE_OUTCOMES>("ACCEPTED");
   const [body, setBody] = useState("");
 
   return (
-    <form action={action} className="card p-4 space-y-3">
-      <input type="hidden" name="id" value={initiativeId} />
+    <form action={action} className="card p-4 sm:p-5 space-y-4">
+      <input type="hidden" name="id" value={id} />
+      <h3 className="sec-title">Албан хариу</h3>
+
+      <div>
+        <label className="label">Шийдвэрийн шинж</label>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {(Object.keys(RESPONSE_OUTCOMES) as (keyof typeof RESPONSE_OUTCOMES)[]).map((k) => (
+            <label key={k} className={"choice"}>
+              <input
+                type="radio"
+                name="outcome"
+                value={k}
+                defaultChecked={k === "ACCEPTED"}
+                onChange={() => setOutcome(k)}
+              />
+              <div>
+                <div className="font-medium text-[14.5px]">{RESPONSE_OUTCOMES[k].label}</div>
+                <div className="hint">{RESPONSE_OUTCOMES[k].hint}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {outcome === "SCHEDULED" && (
+        <div>
+          <label className="label" htmlFor="dueDate">
+            Хэрэгжүүлэх эцсийн хугацаа
+          </label>
+          <input id="dueDate" name="dueDate" type="date" className="input" required />
+        </div>
+      )}
+
       <div>
         <div className="flex items-center justify-between">
-          <label className="label">Явцын мэдээлэл нэмэх</label>
-          <Counter value={body} min={30} />
+          <label className="label" htmlFor="body">
+            Хариуны агуулга
+          </label>
+          <Counter value={body} min={minChars} />
         </div>
         <textarea
+          id="body"
           name="body"
           className="textarea"
-          rows={4}
+          rows={8}
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="Хийгдсэн ажил, дараагийн алхам, хугацааны байдал."
+          placeholder="Юу шалгасан, ямар шийдвэр гаргасан, яагаад гэдгийг тодорхой бичнэ үү."
         />
+        <p className="hint mt-1">
+          Хариу нь заавал эцсийн шийдвэр байх албагүй — хүлээн авсан, хэрэгжүүлэх хугацаа эсвэл
+          татгалзсан шалтгааныг агуулж болно.
+        </p>
       </div>
-      <label className="flex items-center gap-2 text-[14px] cursor-pointer">
-        <input type="checkbox" name="complete" style={{ accentColor: "var(--brand)", width: 16, height: 16 }} />
-        Хэрэгжилт бүрэн дууссан гэж тэмдэглэх
-      </label>
-      <Err msg={state?.error} />
-      {state?.ok && <p className="text-[13.5px]" style={{ color: "var(--ok)" }}>{state.info}</p>}
-      <Submit className="btn btn-primary btn-sm">Нийтлэх</Submit>
+
+      <Submit>Албан хариу илгээх</Submit>
+      <Msg r={state} />
     </form>
   );
 }
 
-/* ═══ Буцаагдсаныг засах ═════════════════════════════════════════ */
-export function ResubmitForm({
-  initiativeId,
-  title,
-  summary,
-  body,
-}: {
-  initiativeId: number;
-  title: string;
-  summary: string;
-  body: string;
-}) {
-  const [state, action] = useActionState(resubmit, null as { ok: boolean; error?: string; info?: string } | null);
+export function ExtendForm({ id, maxDays }: { id: number; maxDays: number }) {
+  const [state, action] = useActionState<ActionResult | null, FormData>(unitExtendRequest, null);
   const [open, setOpen] = useState(false);
-  const [t, setT] = useState(title);
-  const [s, setS] = useState(summary);
-  const [b, setB] = useState(body);
-
-  if (state?.ok)
-    return <div className="text-[14px]" style={{ color: "var(--ok)" }}>{state.info}</div>;
+  const [reason, setReason] = useState("");
 
   if (!open)
     return (
-      <button className="btn btn-primary btn-sm" onClick={() => setOpen(true)}>
-        Засаад дахин илгээх
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(true)}>
+        Хугацаа сунгах
       </button>
     );
 
   return (
-    <form action={action} className="space-y-3 mt-3">
-      <input type="hidden" name="id" value={initiativeId} />
+    <form action={action} className="card p-4 space-y-3">
+      <input type="hidden" name="id" value={id} />
+      <h4 className="font-medium text-[14.5px]">Хугацаа сунгах</h4>
+      <p className="hint">
+        Хуулийн 16.1-ийн дагуу гомдлын хугацааг НЭГ УДАА, {maxDays} хүртэл хоногоор сунгана.
+      </p>
       <div>
-        <div className="flex items-center justify-between">
-          <label className="label">Гарчиг</label>
-          <Counter value={t} min={POLICY.TITLE_MIN} max={POLICY.TITLE_MAX} />
-        </div>
-        <input name="title" className="input" value={t} onChange={(e) => setT(e.target.value)} />
+        <label className="label" htmlFor="days">
+          Хэдэн хоногоор
+        </label>
+        <input
+          id="days"
+          name="days"
+          type="number"
+          className="input"
+          min={1}
+          max={maxDays}
+          defaultValue={maxDays}
+        />
       </div>
       <div>
         <div className="flex items-center justify-between">
-          <label className="label">Товч тайлбар</label>
-          <Counter value={s} min={POLICY.SUMMARY_MIN} max={POLICY.SUMMARY_MAX} />
+          <label className="label" htmlFor="extendReason">
+            Шалтгаан
+          </label>
+          <Counter value={reason} min={20} />
         </div>
-        <textarea name="summary" className="textarea" rows={2} value={s} onChange={(e) => setS(e.target.value)} />
+        <textarea
+          id="extendReason"
+          name="reason"
+          className="textarea"
+          rows={3}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Яагаад нэмэлт хугацаа шаардлагатай вэ? Илгээгчид харагдана."
+        />
       </div>
-      <div>
-        <div className="flex items-center justify-between">
-          <label className="label">Дэлгэрэнгүй</label>
-          <Counter value={b} min={POLICY.BODY_MIN} />
-        </div>
-        <textarea name="body" className="textarea" rows={10} value={b} onChange={(e) => setB(e.target.value)} />
-      </div>
-      <Err msg={state?.error} />
       <div className="flex gap-2">
-        <button type="button" className="btn btn-ghost" onClick={() => setOpen(false)}>
+        <Submit className="btn btn-primary btn-sm">Сунгах</Submit>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>
           Болих
         </button>
-        <Submit className="btn btn-primary">Дахин илгээх</Submit>
       </div>
+      <Msg r={state} />
+    </form>
+  );
+}
+
+export function ReturnForm({ id, minChars }: { id: number; minChars: number }) {
+  const [state, action] = useActionState<ActionResult | null, FormData>(unitReturnRequest, null);
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+
+  if (!open)
+    return (
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(true)}>
+        Хамааралгүй — буцаах
+      </button>
+    );
+
+  return (
+    <form action={action} className="card p-4 space-y-3">
+      <input type="hidden" name="id" value={id} />
+      <h4 className="font-medium text-[14.5px]">Хүсэлтийг буцаах</h4>
+      <p className="hint">
+        Буцаасан хүсэлт модераторт очиж дахин чиглүүлэгдэнэ. Хариу өгөх хугацаа ЗОГСОХГҮЙ — анх
+        илгээсэн өдрөөс тоологдсоор байна.
+      </p>
+      <div>
+        <div className="flex items-center justify-between">
+          <label className="label" htmlFor="returnReason">
+            Шалтгаан
+          </label>
+          <Counter value={reason} min={minChars} />
+        </div>
+        <textarea
+          id="returnReason"
+          name="reason"
+          className="textarea"
+          rows={4}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Яагаад энэ хүсэлт таны нэгжид хамааралгүй вэ?"
+        />
+      </div>
+      <div className="flex gap-2">
+        <Submit className="btn btn-danger btn-sm">Буцаах</Submit>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>
+          Болих
+        </button>
+      </div>
+      <Msg r={state} />
+    </form>
+  );
+}
+
+/* ═══ Илгээгчийн үйлдэл ══════════════════════════════════════════ */
+
+export function CloseRequestForm({ id }: { id: number }) {
+  const [state, action] = useActionState<ActionResult | null, FormData>(closeRequest, null);
+  const [rating, setRating] = useState<number>(3);
+
+  if (state?.ok) return <Msg r={state} />;
+
+  return (
+    <form action={action} className="card p-4 space-y-3">
+      <input type="hidden" name="id" value={id} />
+      <h4 className="font-medium text-[14.5px]">Хариуг хүлээн зөвшөөрч хаах</h4>
+      <div>
+        <label className="label">Хариунд хэр сэтгэл хангалуун байна вэ?</label>
+        <div className="grid gap-2">
+          {RATINGS.map((r) => (
+            <label key={r.value} className={"choice"}>
+              <input
+                type="radio"
+                name="rating"
+                value={r.value}
+                checked={rating === r.value}
+                onChange={() => setRating(r.value)}
+              />
+              <span className="text-[14.5px]">{r.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      <Submit className="btn btn-primary btn-sm">Хаах</Submit>
+      <Msg r={state} />
+    </form>
+  );
+}
+
+/* ═══ Сэтгэгдэл ══════════════════════════════════════════════════ */
+
+export function CommentForm({ initiativeId }: { initiativeId: number }) {
+  const [state, action] = useActionState<ActionResult | null, FormData>(addComment, null);
+  const [body, setBody] = useState("");
+
+  return (
+    <form
+      action={async (fd) => {
+        await action(fd);
+        setBody("");
+      }}
+      className="space-y-2"
+    >
+      <input type="hidden" name="id" value={initiativeId} />
+      <textarea
+        name="body"
+        className="textarea"
+        rows={3}
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        maxLength={2000}
+        placeholder="Санаачилгын талаар бодлоо хуваалцана уу."
+      />
+      <div className="flex items-center justify-between">
+        <Submit className="btn btn-primary btn-sm">Нийтлэх</Submit>
+        <Counter value={body} max={2000} />
+      </div>
+      <Msg r={state} />
+    </form>
+  );
+}
+
+export function ReportButton({
+  commentId,
+  initiativeId,
+}: {
+  commentId: number;
+  initiativeId: number;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (!open)
+    return (
+      <button
+        type="button"
+        className="text-[12.5px] text-ink3 hover:underline"
+        onClick={() => setOpen(true)}
+      >
+        Мэдээлэх
+      </button>
+    );
+
+  return (
+    <form action={reportComment} className="mt-2 flex flex-wrap items-center gap-2">
+      <input type="hidden" name="commentId" value={commentId} />
+      <input type="hidden" name="id" value={initiativeId} />
+      <select name="reason" className="input" style={{ maxWidth: 260 }} required>
+        <option value="">— шалтгаан —</option>
+        {Object.entries(COMMENT_REPORT_REASONS).map(([k, v]) => (
+          <option key={k} value={k}>
+            {v}
+          </option>
+        ))}
+      </select>
+      <Submit className="btn btn-ghost btn-sm">Илгээх</Submit>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>
+        Болих
+      </button>
+    </form>
+  );
+}
+
+/* ═══ Модератор — хүсэлт чиглүүлэх (FR-21) ═══════════════════════ */
+
+export function RouteForm({
+  id,
+  units,
+}: {
+  id: number;
+  units: { id: string; name: string }[];
+}) {
+  const [state, action] = useActionState<ActionResult | null, FormData>(moderateRoute, null);
+  const [reason, setReason] = useState("");
+
+  return (
+    <form action={action} className="space-y-2 mt-3">
+      <input type="hidden" name="id" value={id} />
+      <div className="flex flex-wrap gap-2">
+        <select name="unitId" className="input" style={{ maxWidth: 320 }} required>
+          <option value="">— хариуцах нэгжийг сонгох —</option>
+          {units.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
+          ))}
+        </select>
+        <Submit className="btn btn-primary btn-sm">Чиглүүлэх</Submit>
+      </div>
+      <textarea
+        name="reason"
+        className="textarea"
+        rows={2}
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Яагаад энэ нэгж рүү чиглүүлж байгаа вэ? (заавал биш, гэхдээ бүртгэгдэнэ)"
+      />
+      <Msg r={state} />
     </form>
   );
 }

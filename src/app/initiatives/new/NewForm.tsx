@@ -1,287 +1,224 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import Link from "next/link";
-import { createInitiative } from "@/app/actions";
+import { createInitiative, type ActionResult } from "@/app/actions";
 import { Submit } from "@/components/client";
-import {
-  AUDIENCES,
-  CATEGORIES,
-  GROUPS,
-  POLICY,
-  SCOPES,
-  type Audience,
-  type ScopeKey,
-} from "@/lib/policy";
-import { fmtNum } from "@/lib/format";
+import { AUDIENCES, SCOPES } from "@/lib/labels";
+import type { Audience, Scope } from "@/lib/prisma";
 
-/** Хамрах бүлэг × хүрээ бүрийн урьдчилан тооцсон мэдээлэл. */
-export type ScopeOption = {
-  audience: Audience;
-  scope: ScopeKey;
-  label: string;
-  eligible: number;
-  byGroup: Record<string, number>;
-  threshold: number;
-  days: number;
-};
+type Category = { id: string; name: string; hint: string };
 
-/** Энэ тооноос цөөн эрхтэй хүнтэй хүрээнд сервер санаачилга хүлээн авахгүй. */
-const MIN_ELIGIBLE = 3;
-
-function Counter({ value, min, max }: { value: string; min?: number; max?: number }) {
-  const n = value.length;
-  const bad = (min !== undefined && n < min) || (max !== undefined && n > max);
-  return (
-    <span className="text-[12.5px] tabular-nums" style={{ color: bad ? "var(--bad)" : "var(--ink-3)" }}>
-      {n}
-      {max ? ` / ${max}` : min ? ` (доод тал нь ${min})` : ""}
-    </span>
-  );
-}
-
-/** Санал, гомдлоос санаачилга болгох үед урьдчилан бөглөх утгууд. */
-export type Prefill = {
-  fromId: number;
-  code: string;
-  title: string;
-  summary: string;
-  body: string;
-  category: string;
-};
-
-export default function NewForm({
-  options,
-  defaultAudience,
-  prefill,
+export function NewInitiativeForm({
+  categories,
+  allowedAudiences,
+  canUseClass,
+  schoolName,
+  classYear,
+  scopeSizes,
+  fromRequestId,
 }: {
-  options: ScopeOption[];
-  defaultAudience: Audience;
-  prefill?: Prefill;
+  categories: Category[];
+  allowedAudiences: Audience[];
+  canUseClass: boolean;
+  schoolName: string | null;
+  classYear: number;
+  /** Урьдчилсан тооцоо: `${scope}:${audience}` → { n, threshold } */
+  scopeSizes: Record<string, { n: number; threshold: number }>;
+  fromRequestId?: number;
 }) {
-  const [state, action] = useActionState(
-    createInitiative,
-    null as { ok: boolean; error?: string } | null
-  );
-  const [title, setTitle] = useState(prefill?.title ?? "");
-  const [summary, setSummary] = useState(prefill?.summary ?? "");
-  const [body, setBody] = useState(prefill?.body ?? "");
+  const [state, action] = useActionState<ActionResult | null, FormData>(createInitiative, null);
+  const [scope, setScope] = useState<Scope>("UNIVERSITY");
+  const [audience, setAudience] = useState<Audience>(allowedAudiences[0] ?? "ALL");
+  const [title, setTitle] = useState("");
+  const [summary, setSummary] = useState("");
+  const [body, setBody] = useState("");
 
-  const audiences = [...new Set(options.map((o) => o.audience))];
-  const [audience, setAudience] = useState<Audience>(
-    audiences.includes(defaultAudience) ? defaultAudience : audiences[0]
-  );
-  const [scope, setScope] = useState<ScopeKey>("SCHOOL");
+  const availableScopes: Scope[] = canUseClass && audience === "STUDENT"
+    ? ["UNIVERSITY", "SCHOOL", "CLASS"]
+    : ["UNIVERSITY", "SCHOOL"];
 
-  const scopes = options.filter((o) => o.audience === audience);
-  const info = scopes.find((o) => o.scope === scope) ?? scopes[0];
-  const groups = AUDIENCES[audience].groups;
+  const effectiveScope = availableScopes.includes(scope) ? scope : "UNIVERSITY";
+  const preview = scopeSizes[`${effectiveScope}:${audience}`];
 
-  function changeAudience(next: Audience) {
-    setAudience(next);
-    // Шинэ хамрах бүлэгт одоогийн хүрээ байхгүй бол (жишээ нь курс) их сургууль руу буцна.
-    if (!options.some((o) => o.audience === next && o.scope === scope)) setScope("SCHOOL");
-  }
+  const counter = (v: string, min: number, max?: number) => {
+    const bad = v.length < min || (max !== undefined && v.length > max);
+    return (
+      <span
+        className="text-[12.5px] tabular-nums"
+        style={{ color: bad ? "var(--bad)" : "var(--ink-3)" }}
+      >
+        {v.length}
+        {max ? ` / ${max}` : ` (доод тал нь ${min})`}
+      </span>
+    );
+  };
 
   return (
     <form action={action} className="space-y-5">
-      {prefill && <input type="hidden" name="from" value={prefill.fromId} />}
-      {prefill && (
-        <div
-          className="rounded-[14px] p-4 text-[14px]"
-          style={{ background: "var(--violet-soft)", color: "var(--violet)" }}
-        >
-          <div className="font-medium mb-1">{prefill.code} дугаартай хүсэлтээс санаачилга үүсгэж байна</div>
-          Таны бичсэн агуулгыг урьдчилан бөглөв. Санаачилга нийтэд нээлттэй тул хувийн
-          мэдээллээ хасаж, олон хүнд хамаатай байдлаар засна уу.
-        </div>
-      )}
-      <section className="card p-5 space-y-4">
-        <div>
-          <div className="flex items-center justify-between">
-            <label className="label" htmlFor="title">
-              Гарчиг
-            </label>
-            <Counter value={title} min={POLICY.TITLE_MIN} max={POLICY.TITLE_MAX} />
-          </div>
-          <input
-            id="title"
-            name="title"
-            className="input"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Юуг өөрчлөхийг шаардаж байгаагаа нэг өгүүлбэрээр"
-            maxLength={POLICY.TITLE_MAX}
-          />
-          <p className="hint">
-            Тодорхой үйлдлийг нэрлэнэ үү. «Номын сан муу байна» биш — «Номын санг шалгалтын
-            долоо хоногт 24 цаг ажиллуулах».
-          </p>
-        </div>
+      {fromRequestId ? <input type="hidden" name="from" value={fromRequestId} /> : null}
+      <input type="hidden" name="scope" value={effectiveScope} />
 
-        <div>
-          <div className="flex items-center justify-between">
-            <label className="label" htmlFor="summary">
-              Товч тайлбар
-            </label>
-            <Counter value={summary} min={POLICY.SUMMARY_MIN} max={POLICY.SUMMARY_MAX} />
-          </div>
-          <textarea
-            id="summary"
-            name="summary"
-            className="textarea"
-            rows={2}
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
-            maxLength={POLICY.SUMMARY_MAX}
-            placeholder="Жагсаалт дээр харагдах 1-2 өгүүлбэр."
-          />
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between">
-            <label className="label" htmlFor="body">
-              Дэлгэрэнгүй
-            </label>
-            <Counter value={body} min={POLICY.BODY_MIN} />
-          </div>
-          <textarea
-            id="body"
-            name="body"
-            className="textarea"
-            rows={12}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder={
-              "Асуудал юу вэ? (одоогийн байдал, тоо баримт)\n\nСанал болгож буй шийдэл нь юу вэ? (тодорхой алхмууд)\n\nЯагаад чухал вэ? (хэнд, хэрхэн нөлөөлөх)"
-            }
-          />
-          <p className="hint">
-            Асуудал, шийдэл, үндэслэл гурвыг тусад нь бичвэл зөвлөл шийдвэр гаргахад
-            хялбар болно.
-          </p>
-        </div>
-
-        <div>
-          <label className="label" htmlFor="category">
-            Ангилал
-          </label>
-          <select id="category" name="category" className="select" defaultValue={prefill?.category}>
-            {Object.entries(CATEGORIES).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <label className="label" htmlFor="audience">
-              Хэн санал өгөх вэ
-            </label>
-            <select
-              id="audience"
-              name="audience"
-              className="select"
-              value={audience}
-              onChange={(e) => changeAudience(e.target.value as Audience)}
-            >
-              {audiences.map((a) => (
-                <option key={a} value={a}>
-                  {AUDIENCES[a].label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="scope">
-              Хамрах хүрээ
-            </label>
-            <select
-              id="scope"
-              name="scope"
-              className="select"
-              value={info.scope}
-              onChange={(e) => setScope(e.target.value as ScopeKey)}
-            >
-              {scopes.map((o) => (
-                <option key={o.scope} value={o.scope} disabled={o.eligible < MIN_ELIGIBLE}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <p className="hint" style={{ marginTop: -6 }}>
-          {AUDIENCES[audience].hint} Та зөвхөн өөрийн бүлэг багтсан санал хураалт дэвшүүлнэ.
+      <div>
+        <label className="label" htmlFor="categoryId">
+          Ангилал
+        </label>
+        <select id="categoryId" name="categoryId" className="input" required>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <p className="hint mt-1.5">
+          Босго давсны дараа санаачилга ангиллын дагуу хариуцсан нэгжид шилжинэ.
         </p>
-      </section>
+      </div>
 
-      <section className="card p-5" style={{ background: "var(--surface-2)" }}>
-        <h2 className="text-[15px] font-medium mb-2">Энэ хүрээнд юу болох вэ</h2>
-        <dl className="grid grid-cols-3 gap-3 text-[14px]">
-          <div>
-            <dt className="text-[12.5px] text-ink3">Санал өгөх эрхтэй</dt>
-            <dd className="tabular-nums">{fmtNum(info.eligible)} хүн</dd>
-          </div>
-          <div>
-            <dt className="text-[12.5px] text-ink3">Босго</dt>
-            <dd className="tabular-nums">{fmtNum(info.threshold)} оноо</dd>
-          </div>
-          <div>
-            <dt className="text-[12.5px] text-ink3">Хугацаа</dt>
-            <dd className="tabular-nums">{info.days} хоног</dd>
-          </div>
-        </dl>
-        {groups.length > 1 && (
-          <p className="hint">
-            Үүнээс:{" "}
-            {groups
-              .map((g) => `${fmtNum(info.byGroup[g] ?? 0)} ${GROUPS[g].label.toLowerCase()}`)
-              .join(" · ")}
-            . Үр дүн бүлэг тус бүрээр тусад нь нийтлэгдэнэ.
+      <div>
+        <label className="label">Хэн дэмжих эрхтэй вэ?</label>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {allowedAudiences.map((a) => (
+            <label key={a} className="choice">
+              <input
+                type="radio"
+                name="audience"
+                value={a}
+                checked={audience === a}
+                onChange={() => setAudience(a)}
+              />
+              <div>
+                <div className="font-medium text-[14.5px]">{AUDIENCES[a].label}</div>
+                <div className="hint">{AUDIENCES[a].hint}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+        <p className="hint mt-1.5">
+          Зөвхөн өөрийн харьяалагддаг бүлэг багтсан санаачилга дэвшүүлнэ.
+        </p>
+      </div>
+
+      <div>
+        <label className="label">Хамрах хүрээ</label>
+        <div className="grid gap-2">
+          {availableScopes.map((s) => {
+            const p = scopeSizes[`${s}:${audience}`];
+            const where =
+              s === "UNIVERSITY"
+                ? "ШУТИС даяар"
+                : s === "SCHOOL"
+                  ? (schoolName ?? "Миний бүрэлдэхүүн сургууль")
+                  : `${schoolName ?? ""} · ${classYear}-р курс`;
+            return (
+              <label key={s} className="choice">
+                <input
+                  type="radio"
+                  name="scopeChoice"
+                  value={s}
+                  checked={effectiveScope === s}
+                  onChange={() => setScope(s)}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div className="font-medium text-[14.5px]">{SCOPES[s].label}</div>
+                    {p && (
+                      <div className="text-[13px] text-ink3 tabular-nums whitespace-nowrap">
+                        босго {p.threshold}
+                      </div>
+                    )}
+                  </div>
+                  <div className="hint">
+                    {where}
+                    {p ? ` · ${p.n.toLocaleString("mn-MN")} гишүүн` : ""}
+                  </div>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+        {preview && (
+          <p className="hint mt-2">
+            Хамрах хүрээнд {preview.n.toLocaleString("mn-MN")} гишүүн байна. Батлагдсаны дараа
+            босго <strong>{preview.threshold}</strong> дэмжлэг болж ХӨЛДӨНӨ — цуглуулж байх
+            хугацаанд өөрчлөгдөхгүй.
           </p>
         )}
-        <p className="hint">{SCOPES[info.scope].hint}</p>
-        {info.eligible < MIN_ELIGIBLE && (
-          <p className="text-[13.5px] mt-2" style={{ color: "var(--bad)" }}>
-            Энэ хүрээнд санал өгөх эрхтэй хүн хэт цөөн тул өөр хүрээ сонгоно уу.
-          </p>
-        )}
-      </section>
+      </div>
 
-      <section className="card p-5">
-        <h2 className="text-[15px] font-medium mb-2">Илгээсний дараа юу болох вэ</h2>
-        <ol className="text-[14px] text-ink2 space-y-1.5 list-decimal pl-5">
-          <li>
-            Санаачилга нийтлэгдэхээс өмнө хамрах бүлгийн {POLICY.ENDORSEMENTS_REQUIRED} хүний
-            урьдчилсан дэмжлэг цуглуулна. Линкээ хамт олондоо илгээнэ үү.
-          </li>
-          <li>
-            Модератор {POLICY.MODERATION_HOURS} цагийн дотор журамд нийцэж буй эсэхийг
-            шалгана. Буцаавал шалтгаан, засах зааврыг бичиж өгнө.
-          </li>
-          <li>Нийтлэгдсэний дараа {info.days} хоногийн турш санал хураана.</li>
-          <li>
-            Босго давбал сургуулийн зөвлөл {POLICY.COUNCIL_RESPONSE_DAYS} ажлын өдрийн дотор
-            бичгээр хариулах үүрэгтэй.
-          </li>
-        </ol>
-      </section>
+      <div>
+        <div className="flex items-center justify-between">
+          <label className="label" htmlFor="title">
+            Гарчиг
+          </label>
+          {counter(title, 12, 120)}
+        </div>
+        <input
+          id="title"
+          name="title"
+          className="input"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          maxLength={120}
+          required
+          placeholder="Юуг өөрчлөхийг хүсэж байгаагаа нэг өгүүлбэрээр"
+        />
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between">
+          <label className="label" htmlFor="summary">
+            Товч тайлбар
+          </label>
+          {counter(summary, 40, 300)}
+        </div>
+        <textarea
+          id="summary"
+          name="summary"
+          className="textarea"
+          rows={3}
+          value={summary}
+          onChange={(e) => setSummary(e.target.value)}
+          maxLength={300}
+          required
+          placeholder="Жагсаалтад харагдах 2–3 өгүүлбэр."
+        />
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between">
+          <label className="label" htmlFor="body">
+            Дэлгэрэнгүй
+          </label>
+          {counter(body, 150, 8000)}
+        </div>
+        <textarea
+          id="body"
+          name="body"
+          className="textarea"
+          rows={12}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          maxLength={8000}
+          required
+          placeholder={
+            "Одоогийн байдал — асуудал юу вэ?\n\nСанал — юуг яаж өөрчлөх вэ?\n\nҮндэслэл — яагаад энэ нь зөв шийдэл вэ? Хэнд ямар ач холбогдолтой вэ?"
+          }
+        />
+        <p className="hint mt-1.5">
+          Тодорхой, хэрэгжих боломжтой шаардлага бичсэн санаачилга илүү их дэмжлэг цуглуулдаг.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <Submit>Модераторт илгээх</Submit>
+        <span className="hint">Модератор 48 цагийн дотор хянана.</span>
+      </div>
 
       {state?.error && (
-        <p className="text-[14px]" style={{ color: "var(--bad)" }} role="alert">
+        <p className="text-[13.5px]" style={{ color: "var(--bad)" }} role="alert">
           {state.error}
         </p>
       )}
-
-      <div className="flex gap-2">
-        <Submit className="btn btn-primary">Илгээх</Submit>
-        <Link href="/" className="btn btn-ghost">
-          Болих
-        </Link>
-      </div>
     </form>
   );
 }

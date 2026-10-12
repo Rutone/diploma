@@ -5,35 +5,40 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logout } from "@/app/actions";
 import {
-  IconHome, IconMegaphone, IconClipboard, IconBook, IconShield, IconUsers,
+  IconHome, IconMegaphone, IconBook, IconShield, IconUsers,
   IconMenu, IconClose, IconMoon, IconSun, IconUser, IconCalendar, IconPlus,
   IconClock, IconChart, IconLogout, IconInbox, IconDesk,
 } from "./icons";
-import type { Role } from "@/lib/policy";
+import type { Role } from "@/lib/prisma";
 
 export type ShellUser = {
   name: string;
   short: string;
   role: Role;
   meta: string;
-  /** Нэгжийн хариуцагчид — шийдвэрлэх хүлээгдэж буй санал, гомдлын тоо. */
+  /** Нэгжийн хариуцагчид — шийдвэрлэх хүлээгдэж буй хүсэлтийн тоо. */
   desk: number | null;
+  /** Модератор — хянах хүлээгдэж буй санаачилга + чиглүүлэх хүсэлт. */
+  queue: number | null;
+  /** Уншаагүй мэдэгдэл (FR-28). */
+  unread: number;
 } | null;
 
-export type ShellStats = { active: number; overdue: number; feedbackOnTime: number | null };
+export type ShellStats = { collecting: number; overdue: number; onTime: number | null };
 
 const TITLES: [RegExp, string][] = [
   [/^\/$/, "Нүүр"],
   [/^\/initiatives\/new$/, "Санаачилга дэвшүүлэх"],
   [/^\/initiatives\//, "Санаачилга"],
-  [/^\/feedback\/new$/, "Санал, гомдол илгээх"],
-  [/^\/feedback\/desk/, "Хүсэлтийн ширээ"],
-  [/^\/feedback/, "Санал, гомдол"],
-  [/^\/journal/, "Хэрэгжилтийн дэвтэр"],
+  [/^\/requests\/new$/, "Санал, гомдол илгээх"],
+  [/^\/requests/, "Миний санал, гомдол"],
+  [/^\/unit/, "Нэгжийн самбар"],
+  [/^\/moderation/, "Модерацын самбар"],
+  [/^\/admin/, "Админ самбар"],
+  [/^\/notifications/, "Мэдэгдэл"],
+  [/^\/stats/, "Нээлттэй статистик"],
   [/^\/policy/, "Журам, бодлого"],
-  [/^\/admin/, "Хяналтын самбар"],
-  [/^\/council/, "Зөвлөлийн ажлын самбар"],
-  [/^\/login/, "Нэвтрэх"],
+  [/^\/auth/, "Нэвтрэх"],
 ];
 
 function titleFor(path: string) {
@@ -90,26 +95,27 @@ export default function Shell({
   const isOfficer = user && user.role !== "MEMBER";
 
   const nav: { href: string; label: string; icon: React.ReactNode; exact?: boolean; count?: number }[] = [
-    { href: "/", label: "Нүүр", icon: <IconHome />, exact: true },
-    { href: "/?tab=active", label: "Санаачилгууд", icon: <IconMegaphone /> },
-    { href: "/feedback", label: "Санал, гомдол", icon: <IconInbox /> },
-    { href: "/journal", label: "Хэрэгжилтийн дэвтэр", icon: <IconClipboard /> },
+    { href: "/", label: "Санаачилгууд", icon: <IconHome />, exact: true },
+    ...(user ? [{ href: "/requests", label: "Миний санал, гомдол", icon: <IconInbox /> }] : []),
+    ...(user
+      ? [{ href: "/notifications", label: "Мэдэгдэл", icon: <IconMegaphone />, count: user.unread }]
+      : []),
+    { href: "/stats", label: "Нээлттэй статистик", icon: <IconChart size={21} /> },
     { href: "/policy", label: "Журам, бодлого", icon: <IconBook /> },
     ...(user && user.desk !== null
-      ? [{ href: "/feedback/desk", label: "Хүсэлтийн ширээ", icon: <IconDesk />, count: user.desk }]
+      ? [{ href: "/unit", label: "Нэгжийн самбар", icon: <IconDesk />, count: user.desk }]
       : []),
     ...(user && (user.role === "MODERATOR" || user.role === "ADMIN")
-      ? [{ href: "/admin", label: "Хяналтын самбар", icon: <IconShield /> }]
+      ? [{ href: "/moderation", label: "Модерацын самбар", icon: <IconShield />, count: user.queue ?? 0 }]
       : []),
-    ...(user && (user.role === "COUNCIL" || user.role === "ADMIN")
-      ? [{ href: "/council", label: "Зөвлөлийн самбар", icon: <IconUsers /> }]
+    ...(user && user.role === "ADMIN"
+      ? [{ href: "/admin", label: "Админ самбар", icon: <IconUsers /> }]
       : []),
   ];
 
   const active = (href: string, exact?: boolean) => {
     const base = href.split("?")[0];
     if (exact) return path === "/";
-    if (base === "/feedback") return path.startsWith("/feedback") && !path.startsWith("/feedback/desk");
     return base !== "/" && path.startsWith(base);
   };
 
@@ -176,7 +182,7 @@ export default function Shell({
                 Санаачилга дэвшүүлэх
               </Link>
               <Link
-                href="/feedback/new"
+                href="/requests/new"
                 className="btn btn-ghost w-full"
                 onClick={() => setOpen(false)}
               >
@@ -194,8 +200,8 @@ export default function Shell({
               <IconChart size={18} />
             </span>
             <div className="leading-tight min-w-0">
-              <div className="text-[14px] font-medium">{stats.active} идэвхтэй</div>
-              <div className="text-[11.5px] text-ink3">Санал хураалт</div>
+              <div className="text-[14px] font-medium">{stats.collecting} цуглуулж буй</div>
+              <div className="text-[11.5px] text-ink3">Санаачилга</div>
             </div>
           </div>
           <div className="side-tile">
@@ -216,7 +222,7 @@ export default function Shell({
               >
                 {stats.overdue} хоцорсон
               </div>
-              <div className="text-[11.5px] text-ink3">Зөвлөлийн хариу</div>
+              <div className="text-[11.5px] text-ink3">Хугацаа хэтэрсэн хүсэлт</div>
             </div>
           </div>
           <div className="side-tile">
@@ -225,9 +231,9 @@ export default function Shell({
             </span>
             <div className="leading-tight min-w-0">
               <div className="text-[14px] font-medium">
-                {stats.feedbackOnTime === null ? "—" : `${stats.feedbackOnTime}%`} хугацаандаа
+                {stats.onTime === null ? "—" : `${stats.onTime}%`} хугацаандаа
               </div>
-              <div className="text-[11.5px] text-ink3">Санал, гомдлын хариу</div>
+              <div className="text-[11.5px] text-ink3">Хариу өгөлт</div>
             </div>
           </div>
         </div>
@@ -277,8 +283,8 @@ export default function Shell({
                 </form>
               </div>
             ) : (
-              <Link href="/login" className="btn btn-primary btn-sm">
-                Нэвтрэх
+              <Link href="/auth/login" className="btn btn-primary btn-sm">
+                ШУТИС SSO-оор нэвтрэх
               </Link>
             )}
           </div>
@@ -303,7 +309,7 @@ export default function Shell({
               <Link href="/policy" className="link">Санал хураалтын журам</Link>
               <Link href="/policy#moderation" className="link">Модерацийн журам</Link>
               <Link href="/policy#privacy" className="link">Нууцлалын бодлого</Link>
-              <Link href="/policy#feedback" className="link">Санал, гомдлын журам</Link>
+              <Link href="/policy#legal" className="link">Хуулийн хугацаа</Link>
               <Link href="/policy#appeal" className="link">Давж заалдах</Link>
             </div>
             <p>
