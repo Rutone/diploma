@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logout } from "@/app/actions";
+import Footer from "./footer";
 import {
   IconHome, IconMegaphone, IconBook, IconShield, IconUsers,
   IconMenu, IconClose, IconMoon, IconSun, IconUser, IconCalendar, IconPlus,
@@ -303,22 +304,7 @@ export default function Shell({
           <div className="mx-auto max-w-[1180px]">{children}</div>
         </main>
 
-        <footer className="px-4 sm:px-6 py-6 border-t border-line text-[13px] text-ink3">
-          <div className="mx-auto max-w-[1180px] space-y-2">
-            <div className="flex flex-wrap gap-x-5 gap-y-1">
-              <Link href="/policy" className="link">Санал хураалтын журам</Link>
-              <Link href="/policy#moderation" className="link">Модерацийн журам</Link>
-              <Link href="/policy#privacy" className="link">Нууцлалын бодлого</Link>
-              <Link href="/policy#legal" className="link">Хуулийн хугацаа</Link>
-              <Link href="/policy#appeal" className="link">Давж заалдах</Link>
-            </div>
-            <p>
-              Вебэд суурилсан санал, санаачилга хүлээн авах, дэмжлэг цуглуулах цахим платформ ·
-              бакалаврын дипломын ажлын хүрээнд боловсруулсан загвар систем
-              {isOfficer ? " · удирдлагын эрхээр нэвтэрсэн" : ""}.
-            </p>
-          </div>
-        </footer>
+        <Footer note={isOfficer ? "удирдлагын эрхээр нэвтэрсэн" : undefined} />
       </div>
     </div>
   );
