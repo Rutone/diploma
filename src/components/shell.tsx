@@ -318,7 +318,7 @@ export default function Shell({
               </div>
             ) : (
               <Link href="/auth/login" className="btn btn-primary btn-sm">
-                ШУТИС SSO-оор нэвтрэх
+                Нэвтрэх
               </Link>
             )}
           </div>

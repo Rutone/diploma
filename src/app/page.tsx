@@ -98,7 +98,7 @@ export default async function Home({
           {!user && (
             <div className="mt-4">
               <Link href="/auth/login" className="btn btn-primary">
-                ШУТИС SSO-оор нэвтрэх
+                Нэвтрэх
               </Link>
             </div>
           )}

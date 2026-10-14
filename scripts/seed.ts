@@ -27,6 +27,7 @@ import {
   type Break,
 } from "../src/lib/rules/deadline";
 import { addCivilDays, civilToDbDate, endOfCivilDay, toCivilDate } from "../src/lib/rules/dates";
+import { TEST_ACCOUNTS } from "../src/lib/auth/test-accounts";
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -255,18 +256,21 @@ async function main() {
     }
   }
 
-  // Нэрлэсэн демо бүртгэлүүд — нэвтрэх хуудсанд харагдана.
-  // Кодыг нь «DEMO-» угтвартай болгосон нь жагсаалтаас найдвартай олоход
-  // хэрэгтэй (олноор үүсгэсэн мөрүүдийн created_at ижил байдаг).
-  addUser({ code: "B210910806", name: "Д. Азжаргал", memberType: "STUDENT", schoolId: schoolBy.get("МХТС")!.id, year: 4, position: "Программ хангамжийн инженерчлэл" });
-  addUser({ code: "DEMO-STUDENT", name: "Б. Сувдаа", memberType: "STUDENT", schoolId: schoolBy.get("МХТС")!.id, year: 2, position: "Мэдээллийн систем" });
-  addUser({ code: "DEMO-TEACHER", name: "Г. Ганчимэг", memberType: "TEACHER", schoolId: schoolBy.get("МХТС")!.id, position: "Компьютерын ухааны салбар" });
-  addUser({ code: "DEMO-MODERATOR", name: "Ж. Алимаа", memberType: "TEACHER", schoolId: schoolBy.get("МХТС")!.id, position: "Компьютерын ухааны салбар", role: "MODERATOR" });
-  addUser({ code: "DEMO-UNIT-SURGALT", name: "С. Болормаа", memberType: "STAFF", position: "Сургалтын бодлого, зохицуулалтын алба", role: "UNIT_STAFF", unitId: unitBy.get("SURGALT")!.id });
-  addUser({ code: "DEMO-UNIT-OYUTAN", name: "Б. Энхтөр", memberType: "STAFF", position: "Оюутны хөгжлийн алба", role: "UNIT_STAFF", unitId: unitBy.get("OYUTAN")!.id });
-  addUser({ code: "DEMO-UNIT-MTT", name: "Н. Батзориг", memberType: "STAFF", position: "Мэдээллийн технологийн төв", role: "UNIT_STAFF", unitId: unitBy.get("MTT")!.id });
-  addUser({ code: "DEMO-UNIT-AJAHUI", name: "Р. Цэрэндолгор", memberType: "STAFF", position: "Аж ахуйн алба", role: "UNIT_STAFF", unitId: unitBy.get("AJAHUI")!.id });
-  addUser({ code: "DEMO-ADMIN", name: "Т. Мөнхжаргал", memberType: "STAFF", position: "Системийн администратор", role: "ADMIN" });
+  // Туршилтын бүртгэлүүд — нэвтрэх хуудсанд харагдана.
+  // Жагсаалт нь src/lib/auth/test-accounts.ts-д төвлөрсөн тул seed болон
+  // нэвтрэх хуудас хоёр зөрөх боломжгүй.
+  for (const a of TEST_ACCOUNTS) {
+    addUser({
+      code: a.code,
+      name: a.name,
+      memberType: a.memberType,
+      role: a.role,
+      schoolId: a.schoolCode ? schoolBy.get(a.schoolCode)!.id : null,
+      unitId: a.unitCode ? unitBy.get(a.unitCode)!.id : null,
+      position: a.position,
+      year: a.year ?? 0,
+    });
+  }
 
   // Багцлан оруулна — 15 000+ мөр.
   const BATCH = 2000;
@@ -276,7 +280,7 @@ async function main() {
   console.log(`  ${users.length.toLocaleString("mn-MN")} хэрэглэгч`);
 
   const demo = await prisma.user.findMany({
-    where: { OR: [{ code: "B210910806" }, { code: { startsWith: "DEMO-" } }] },
+    where: { code: { in: TEST_ACCOUNTS.map((a) => a.code) } },
     orderBy: { code: "asc" },
   });
   const demoBy = new Map(demo.map((d) => [d.name, d]));

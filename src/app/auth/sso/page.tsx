@@ -1,118 +1,138 @@
 import { prisma } from "@/lib/prisma";
-import { MEMBER_TYPES, ROLES } from "@/lib/labels";
+import {
+  STUDENT_WEB_LOGIN_URL,
+  TEST_ACCOUNTS,
+  TEST_ROLE_LABELS,
+  TEST_ROLE_ORDER,
+} from "@/lib/auth/test-accounts";
 import { Notice } from "@/components/ui";
+import { IconArrowRight, IconUser } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
 /**
- * ХУУРАМЧ SSO нэвтрэх дэлгэц — auth.must.edu.mn-ийг дуурайна.
+ * Нэвтрэх хуудас.
  *
- * Бодит систем дээр энэ хуудас ОРШИХГҮЙ: хэрэглэгч сургуулийн нэгдсэн
- * нэвтрэлтийн серверт очиж, тэндээ нэвтэрч, нэг удаагийн кодтой буцаж
- * ирнэ. Энд уг урсгалыг хамгаалалт, туршилтад зориулан дуурайлгасан.
+ * Систем нь ШУТИС-ийн оюутны вебийн («Мэдээ мэдээлэл» цэсний доорх «RC
+ * систем» сонголт) үргэлжлэл болж ажиллана. Жинхэнэ ашиглалтад
+ * хэрэглэгчийг оюутны вебийн нэвтрэлт баталгаажуулна.
+ *
+ * ТУРШИЛТЫН ШАТАНД нууц үг шалгахгүй: нэвтрэх код оруулахад л хангалттай.
+ * Эрх тус бүрийн ажиллагааг шалгахад хялбар байхаар бүртгэлүүдийг
+ * бүлэглэн харуулж, нэг товшилтоор нэвтрэх боломжтой болгов.
  */
 
-
-export default async function SsoPage({
+export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ state?: string; redirect_uri?: string; error?: string }>;
 }) {
   const sp = await searchParams;
+  const state = sp.state ?? "";
+  const redirectUri = sp.redirect_uri ?? "/auth/callback";
 
-  // Туршилтын бүртгэлүүд — seed-д тусгайлан тэмдэглэсэн кодуудаар олно.
-  const demo = await prisma.user.findMany({
-    where: { OR: [{ code: "B210910806" }, { code: { startsWith: "DEMO-" } }] },
-    include: { unit: true, school: true },
+  // Зөвхөн өгөгдлийн санд үнэхээр байгаа бүртгэлийг харуулна.
+  const existing = await prisma.user.findMany({
+    where: { code: { in: TEST_ACCOUNTS.map((a) => a.code) }, active: true },
+    select: { code: true },
   });
+  const live = new Set(existing.map((u) => u.code));
+  const accounts = TEST_ACCOUNTS.filter((a) => live.has(a.code));
 
-  const order: Record<string, number> = { MEMBER: 0, UNIT_STAFF: 1, MODERATOR: 2, ADMIN: 3 };
-  const accounts = demo
-    .map((a) => ({
-      id: a.id,
-      code: a.code,
-      name: a.name,
-      role: a.role,
-      memberType: a.memberType,
-      schoolCode: a.school?.code ?? null,
-      unitName: a.unit?.name ?? null,
-    }))
-    .sort((x, y) => order[x.role] - order[y.role] || x.code.localeCompare(y.code));
+  const byGroup = TEST_ROLE_ORDER.map((g) => ({
+    group: g,
+    meta: TEST_ROLE_LABELS[g],
+    items: accounts.filter((a) => a.group === g),
+  })).filter((s) => s.items.length > 0);
 
   return (
-    <div className="mx-auto max-w-[560px] space-y-5">
-      <div className="card p-5 sm:p-6">
-        <div className="flex items-center gap-3 mb-4 pb-4 border-b border-line">
-          <span className="choice-icon" aria-hidden>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <rect x="3" y="11" width="18" height="10" rx="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-          </span>
-          <div>
-            <h2 className="text-[17px] font-medium leading-tight">ШУТИС нэгдсэн нэвтрэлт</h2>
-            <p className="text-[12.5px] text-ink3">auth.must.edu.mn</p>
-          </div>
-        </div>
+    <div className="mx-auto max-w-[760px] space-y-4">
+      {sp.error && <Notice tone="red">{sp.error}</Notice>}
 
-        <Notice tone="amber" title="Энэ бол хөгжүүлэлтийн орчны загвар дэлгэц">
-          Бодит системд энэ хуудас сургуулийн нэвтрэлтийн сервер дээр байрлах бөгөөд ДАН системтэй
-          холбогдоно. Таны нууц үг платформд хэзээ ч дамжихгүй — SSO зөвхөн нэг удаагийн код
-          буцаана.
-        </Notice>
+      {/* ── Оюутны вебээр нэвтрэх ── */}
+      <section className="card p-5 sm:p-6">
+        <h2 className="text-[19px] font-medium mb-1">Нэвтрэх</h2>
+        <p className="text-[14px] text-ink2 leading-relaxed">
+          Энэ систем нь ШУТИС-ийн оюутны вебийн үргэлжлэл болж ажиллана. Оюутан, багш, ажилтан{" "}
+          <strong>student.must.edu.mn</strong> дээр нэвтэрсний дараа зүүн талын цэсний «Мэдээ
+          мэдээлэл»-ийн доорх <strong>«RC систем»</strong> сонголтоор энэ платформ руу шилжинэ.
+        </p>
 
-        {sp.error && (
-          <div className="mt-4">
-            <Notice tone="red">{sp.error}</Notice>
-          </div>
-        )}
+        <a
+          href={STUDENT_WEB_LOGIN_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-primary mt-4"
+        >
+          Оюутны веб рүү очих
+          <IconArrowRight />
+        </a>
+        <p className="hint mt-2">student.must.edu.mn — шинэ цонхонд нээгдэнэ.</p>
+      </section>
 
-        <form method="post" action="/auth/sso/authorize" className="mt-5 space-y-4">
-          <input type="hidden" name="state" value={sp.state ?? ""} />
-          <input type="hidden" name="redirect_uri" value={sp.redirect_uri ?? "/auth/callback"} />
-          <div>
-            <label className="label" htmlFor="userCode">
-              Оюутны код / ажилтны дугаар
-            </label>
-            <input
-              id="userCode"
-              name="userCode"
-              className="input"
-              placeholder="B210910806"
-              autoComplete="off"
-              required
-            />
+      {/* ── Туршилтын нэвтрэлт ── */}
+      <Notice tone="amber" title="Туршилтын горим">
+        Систем туршилтын шатанд байгаа тул нууц үг шалгахгүй — нэвтрэх код оруулахад л
+        хангалттай. Доорх бүртгэлээс сонгоход тухайн эрхээр шууд нэвтэрнэ.
+      </Notice>
+
+      {byGroup.map(({ group, meta, items }) => (
+        <section key={group} className="card p-4 sm:p-5">
+          <h3 className="sec-title">{meta.label}</h3>
+          <p className="hint mt-1 mb-3">{meta.hint}</p>
+
+          <div className="grid gap-2">
+            {items.map((a) => (
+              <form key={a.code} method="post" action="/auth/sso/authorize">
+                <input type="hidden" name="userCode" value={a.code} />
+                <input type="hidden" name="state" value={state} />
+                <input type="hidden" name="redirect_uri" value={redirectUri} />
+                <button type="submit" className="choice w-full text-left">
+                  <span className="choice-icon">
+                    <IconUser size={19} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+                      <span className="font-medium text-[14.5px]">{a.name}</span>
+                      <code className="text-[13px] text-ink3 tabular-nums">{a.code}</code>
+                    </span>
+                    <span className="hint block">
+                      {a.position}
+                      {a.schoolCode ? ` · ${a.schoolCode}` : ""}
+                      {a.year ? ` · ${a.year}-р курс` : ""}
+                    </span>
+                    <span className="hint block mt-0.5">{a.hint}</span>
+                  </span>
+                </button>
+              </form>
+            ))}
           </div>
-          <button type="submit" className="btn btn-primary w-full">
-            Баталгаажуулах
+        </section>
+      ))}
+
+      {/* ── Кодоор нэвтрэх ── */}
+      <section className="card p-4 sm:p-5">
+        <h3 className="sec-title mb-1">Кодоор нэвтрэх</h3>
+        <p className="hint mb-3">
+          Дээрх жагсаалтад байхгүй бүртгэлээр нэвтрэх бол оюутны код, багшийн код эсвэл ажилтны
+          дугаарыг оруулна уу.
+        </p>
+        <form method="post" action="/auth/sso/authorize" className="flex flex-wrap gap-2">
+          <input type="hidden" name="state" value={state} />
+          <input type="hidden" name="redirect_uri" value={redirectUri} />
+          <input
+            name="userCode"
+            className="input"
+            style={{ maxWidth: 280 }}
+            placeholder="B210910806"
+            autoComplete="off"
+            required
+          />
+          <button type="submit" className="btn btn-ghost">
+            Нэвтрэх
           </button>
         </form>
-      </div>
-
-      <div className="card p-5">
-        <h3 className="sec-title mb-3">Туршилтын бүртгэлүүд</h3>
-        <p className="hint mb-3">
-          Эрх тус бүрийн дэлгэцийг шалгахад ашиглана. Кодыг дээрх талбарт хуулж оруулна уу.
-        </p>
-        <div className="space-y-2">
-          {accounts.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center justify-between gap-3 py-2 border-b border-line last:border-0"
-            >
-              <div className="min-w-0">
-                <div className="text-[14px] font-medium">{a.name}</div>
-                <div className="text-[12.5px] text-ink3">
-                  {MEMBER_TYPES[a.memberType].label} · {ROLES[a.role].label}
-                  {a.unitName ? ` · ${a.unitName}` : ""}
-                  {a.schoolCode ? ` · ${a.schoolCode}` : ""}
-                </div>
-              </div>
-              <code className="text-[13px] tabular-nums shrink-0">{a.code}</code>
-            </div>
-          ))}
-        </div>
-      </div>
+      </section>
     </div>
   );
 }
