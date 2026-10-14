@@ -23,7 +23,7 @@ import {
 
 const SOCIAL = [
   { href: "https://www.facebook.com/www.must.edu.mn", label: "Facebook", Icon: IconFacebook },
-  { href: "https://www.instagram.com/must.edu.mn", label: "Instagram", Icon: IconInstagram },
+  { href: "https://www.instagram.com/must.shutis/", label: "Instagram", Icon: IconInstagram },
   { href: "https://twitter.com/must_edu_mn", label: "Twitter", Icon: IconTwitter },
   { href: "https://www.youtube.com/@must_edu_mn", label: "YouTube", Icon: IconYoutube },
 ];
