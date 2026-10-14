@@ -786,3 +786,97 @@
     .site-footer-top { transition: opacity 0.2s, visibility 0.2s; }
   }
 }
+
+/* ═══ Хажуугийн цэсийг хураах ══════════════════════════════════════
+   Төлөв нь <html data-sidebar="collapsed"> дээр хадгалагдана. React-ийн
+   төлөвт биш DOM дээр байдаг учир серверийн рендертэй зөрөхгүй, хуудас
+   ачаалахад анивчихгүй (layout.tsx дахь BOOT_SCRIPT).
+
+   Зөвхөн 1024px-ээс өргөн дэлгэцэд үйлчилнэ — гар утсан дээр цэс нь
+   бүрэн далд, тусдаа хөшигний зарчмаар ажилладаг.                     */
+
+@layer components {
+  .side-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* Хураах товч нь зөвхөн өргөн дэлгэцэд хэрэгтэй. */
+  .side-toggle { display: none; }
+
+  .only-expanded,
+  .only-collapsed { display: grid; place-items: center; }
+  .only-collapsed { display: none; }
+
+  @media (min-width: 1024px) {
+    .sidebar {
+      transition: width 0.2s ease;
+    }
+    .side-toggle {
+      display: grid;
+      margin: -2px -4px 0 0;
+      flex-shrink: 0;
+    }
+
+    :root[data-sidebar="collapsed"] .sidebar { width: 68px; }
+
+    /* Хураасан үед зөвхөн дүрс үлдэнэ. */
+    :root[data-sidebar="collapsed"] .side-label { display: none; }
+
+    :root[data-sidebar="collapsed"] .only-expanded { display: none; }
+    :root[data-sidebar="collapsed"] .only-collapsed { display: grid; }
+
+    /* Толгой — тэмдэг ба товч босоо тэнхлэгт эгнэнэ. */
+    :root[data-sidebar="collapsed"] .side-head {
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 8px;
+    }
+    :root[data-sidebar="collapsed"] .side-toggle { margin: 0; }
+
+    /* Цэсийн мөр — дүрс голлоно, тоолуур нь өнцөгт жижиг тэмдэг болно. */
+    :root[data-sidebar="collapsed"] .nav-item {
+      position: relative;
+      justify-content: center;
+      gap: 0;
+      margin: 1px 10px;
+      padding: 10px 0;
+    }
+    :root[data-sidebar="collapsed"] .nav-count {
+      position: absolute;
+      top: 3px;
+      right: 3px;
+      margin: 0;
+      min-width: 17px;
+      padding: 0 4px;
+      font-size: 10.5px;
+      line-height: 16px;
+    }
+
+    /* Үйлдлийн товчнууд — дөрвөлжин, зөвхөн дүрстэй. */
+    :root[data-sidebar="collapsed"] nav .btn {
+      width: 44px;
+      height: 40px;
+      min-width: 0;
+      padding: 0;
+      margin: 0 auto;
+      gap: 0;
+    }
+    :root[data-sidebar="collapsed"] nav > div { padding-inline: 0; }
+
+    /* Доод мэдээллийн хайрцгууд — зөвхөн дүрс. */
+    :root[data-sidebar="collapsed"] .side-tile {
+      justify-content: center;
+      gap: 0;
+      padding: 8px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar { transition: none; }
+  }
+}

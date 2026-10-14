@@ -9,6 +9,7 @@ import {
   IconHome, IconMegaphone, IconBook, IconShield, IconUsers,
   IconMenu, IconClose, IconMoon, IconSun, IconUser, IconCalendar, IconPlus,
   IconClock, IconChart, IconLogout, IconInbox, IconDesk,
+  IconPanelCollapse, IconPanelExpand,
 } from "./icons";
 import type { Role } from "@/lib/prisma";
 
@@ -93,6 +94,24 @@ export default function Shell({
     }
   }
 
+  /**
+   * Хажуугийн цэсийг хураах / задлах. Сэдвийн товчтой ижил зарчмаар
+   * DOM дээрх data-sidebar нь цорын ганц эх сурвалж болно — React-ийн
+   * төлөвт хадгалбал серверийн рендертэй зөрөх эрсдэлтэй.
+   */
+  function toggleSidebar() {
+    const root = document.documentElement;
+    const next = root.getAttribute("data-sidebar") === "collapsed" ? null : "collapsed";
+    if (next) root.setAttribute("data-sidebar", next);
+    else root.removeAttribute("data-sidebar");
+    try {
+      if (next) localStorage.setItem("sidebar", next);
+      else localStorage.removeItem("sidebar");
+    } catch {
+      /* хувийн горимд хадгалагдахгүй байж болно */
+    }
+  }
+
   const isOfficer = user && user.role !== "MEMBER";
 
   const nav: { href: string; label: string; icon: React.ReactNode; exact?: boolean; count?: number }[] = [
@@ -133,9 +152,9 @@ export default function Shell({
       )}
 
       <aside className="sidebar" data-open={open}>
-        <div className="flex items-start gap-2.5 px-4 py-4 border-b border-line">
+        <div className="side-head">
           <Emblem />
-          <div className="min-w-0 flex-1">
+          <div className="side-label min-w-0 flex-1">
             <div
               className="text-[11.5px] font-medium leading-[1.35] uppercase"
               style={{ color: "var(--brand-ink)" }}
@@ -148,6 +167,17 @@ export default function Shell({
               Feedback &amp; initiative platform
             </div>
           </div>
+
+          <button
+            className="icon-btn side-toggle"
+            onClick={toggleSidebar}
+            aria-label="Хажуугийн цэсийг хураах / задлах"
+            title="Хажуугийн цэсийг хураах / задлах"
+          >
+            <span className="only-expanded"><IconPanelCollapse size={19} /></span>
+            <span className="only-collapsed"><IconPanelExpand size={19} /></span>
+          </button>
+
           <button
             className="icon-btn lg:hidden -mt-1 -mr-1"
             onClick={() => setOpen(false)}
@@ -165,9 +195,10 @@ export default function Shell({
               className="nav-item"
               data-active={active(n.href, n.exact)}
               onClick={() => setOpen(false)}
+              title={n.label}
             >
               {n.icon}
-              <span>{n.label}</span>
+              <span className="side-label">{n.label}</span>
               {!!n.count && <span className="nav-count">{n.count}</span>}
             </Link>
           ))}
@@ -178,17 +209,19 @@ export default function Shell({
                 href="/initiatives/new"
                 className="btn btn-primary w-full"
                 onClick={() => setOpen(false)}
+                title="Санаачилга дэвшүүлэх"
               >
                 <IconPlus />
-                Санаачилга дэвшүүлэх
+                <span className="side-label">Санаачилга дэвшүүлэх</span>
               </Link>
               <Link
                 href="/requests/new"
                 className="btn btn-ghost w-full"
                 onClick={() => setOpen(false)}
+                title="Санал, гомдол илгээх"
               >
                 <IconInbox size={18} />
-                Санал, гомдол илгээх
+                <span className="side-label">Санал, гомдол илгээх</span>
               </Link>
             </div>
           )}
@@ -196,11 +229,11 @@ export default function Shell({
 
         {/* Порталын доод картуудын хэв маяг */}
         <div className="p-3 space-y-2 border-t border-line">
-          <div className="side-tile">
+          <div className="side-tile" title="Дэмжлэг цуглуулж буй санаачилга">
             <span className="tile-icon">
               <IconChart size={18} />
             </span>
-            <div className="leading-tight min-w-0">
+            <div className="side-label leading-tight min-w-0">
               <div className="text-[14px] font-medium">{stats.collecting} цуглуулж буй</div>
               <div className="text-[11.5px] text-ink3">Санаачилга</div>
             </div>
@@ -216,7 +249,7 @@ export default function Shell({
             >
               <IconClock size={18} />
             </span>
-            <div className="leading-tight min-w-0">
+            <div className="side-label leading-tight min-w-0">
               <div
                 className="text-[14px] font-medium"
                 style={stats.overdue > 0 ? { color: "var(--bad)" } : undefined}
@@ -226,11 +259,11 @@ export default function Shell({
               <div className="text-[11.5px] text-ink3">Хугацаа хэтэрсэн хүсэлт</div>
             </div>
           </div>
-          <div className="side-tile">
+          <div className="side-tile" title="Дэмжлэг цуглуулж буй санаачилга">
             <span className="tile-icon">
               <IconInbox size={18} />
             </span>
-            <div className="leading-tight min-w-0">
+            <div className="side-label leading-tight min-w-0">
               <div className="text-[14px] font-medium">
                 {stats.onTime === null ? "—" : `${stats.onTime}%`} хугацаандаа
               </div>

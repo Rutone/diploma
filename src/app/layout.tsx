@@ -14,8 +14,17 @@ export const metadata: Metadata = {
     "ШУТИС-ийн оюутан, багш, ажилтны санал, гомдлыг хариуцах нэгжид шууд хүргэж, нийтийн санаачилгад дэмжлэг цуглуулах веб систем.",
 };
 
-/** Хуудас ачаалахаас өмнө сэдвийг тогтоож, анивчихаас сэргийлнэ. */
-const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();`;
+/**
+ * Хуудас ачаалахаас өмнө сэдэв болон хажуугийн цэсийн төлөвийг тогтоож,
+ * анивчихаас сэргийлнэ. Эдгээр нь React-ийн төлөвт биш, DOM дээр
+ * хадгалагддаг тул сервер ба хөтчийн рендер зөрөхгүй.
+ */
+const BOOT_SCRIPT = `(function(){try{
+var r=document.documentElement;
+var t=localStorage.getItem('theme');
+if(t==='dark'||t==='light'){r.setAttribute('data-theme',t);}
+if(localStorage.getItem('sidebar')==='collapsed'){r.setAttribute('data-sidebar','collapsed');}
+}catch(e){}})();`;
 
 export default async function RootLayout({
   children,
@@ -75,7 +84,7 @@ export default async function RootLayout({
   return (
     <html lang="mn" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: BOOT_SCRIPT }} />
       </head>
       <body>
         <Shell

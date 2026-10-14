@@ -288,3 +288,20 @@ export const IconSeal = ({ size = 48, className }: P) => (
     <path d="M17.6 19.5v9M30.4 19.5v9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
   </svg>
 );
+
+/** Хажуугийн цэсийг хураах / задлах дүрс. */
+export const IconPanelCollapse = ({ size = 20, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
+    <path d="M10 4.5v15" />
+    <path d="m7.3 10.5-1.6 1.5 1.6 1.5" />
+  </svg>
+);
+
+export const IconPanelExpand = ({ size = 20, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
+    <path d="M10 4.5v15" />
+    <path d="m5.7 10.5 1.6 1.5-1.6 1.5" />
+  </svg>
+);
