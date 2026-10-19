@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "vercel-build": "prisma migrate deploy && next build"
+    "vercel-build": "prisma migrate deploy && node --import tsx scripts/seed.ts --if-empty && next build"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",

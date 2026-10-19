@@ -8,7 +8,14 @@
  *     МХТС   N = 2 811 → B = 29        МехТС  N = 1 091 → B = 25
  *     БУХС   N =    45 → B =  9        НБТөв  N =    23 → B =  5
  *
- * Ажиллуулах:  npm run seed
+ * Ажиллуулах:
+ *   npm run seed                 — санг БҮХЭЛД нь цэвэрлээд шинээр үүсгэнэ
+ *   npm run seed -- --if-empty   — зөвхөн сан ХООСОН үед үүсгэнэ, эс бөгөөс алгасна
+ *
+ * `--if-empty` нь Vercel-ийн build дотор ашиглагдана: анхны байршуулалтад
+ * сан хоосон тул жишээ өгөгдлөөр дүүргэж, дараагийн байршуулалт бүрт
+ * хэрэглэгч байгааг хараад ЮУ Ч ХИЙХГҮЙ. Ингэснээр бодит өгөгдөл
+ * хэзээ ч устахгүй, холболтын нууц үгийг гараар дамжуулах шаардлагагүй.
  */
 
 import "dotenv/config";
@@ -109,6 +116,16 @@ function personName(i: number): string {
 
 async function main() {
   const t0 = Date.now();
+
+  if (process.argv.includes("--if-empty")) {
+    const existing = await prisma.user.count();
+    if (existing > 0) {
+      console.log(`Сан хоосон биш (${existing.toLocaleString("mn-MN")} хэрэглэгч). Seed алгасав.`);
+      return;
+    }
+    console.log("Сан хоосон байна — жишээ өгөгдлөөр дүүргэнэ.");
+  }
+
   console.log("Өгөгдлийн санг цэвэрлэж байна…");
 
   // Хамаарлын дарааллаар — FK зөрчихгүй.
