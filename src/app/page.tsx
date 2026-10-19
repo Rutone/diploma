@@ -105,7 +105,7 @@ export default async function Home({
             </div>
           )}
 
-          <div className="grid sm:grid-cols-2 gap-2 mt-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 mt-4">
             <Link href="/initiatives/new" className="choice">
               <span className="choice-icon">
                 <IconBulb size={20} />
