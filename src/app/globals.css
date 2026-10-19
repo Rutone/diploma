@@ -148,11 +148,21 @@
     font-family: "Segoe UI", Roboto, "Noto Sans", system-ui, -apple-system, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     line-height: 1.65;
+    /* Хэрэглэгчийн бичсэн дунд зайгүй урт үг (холбоос, санамсаргүй тэмдэгт мөр)
+       картаас гарч хуудсыг хажуу тийш гүйлгэхгүйн тулд заавал мөр таслана. */
+    overflow-wrap: break-word;
   }
 
   h1, h2, h3 {
     line-height: 1.35;
     letter-spacing: -0.005em;
+  }
+
+  /* Хэрэглэгчийн текст голдуу агуулагддаг элементүүд. `anywhere` нь
+     `break-word`-оос ялгаатай нь доод хэмжээг (min-content) бас багасгадаг тул
+     grid/flex дотор байгаа тэмдэгт мөр ч хуудсыг тэлж чадахгүй. */
+  h1, h2, h3, h4, p, li, blockquote {
+    overflow-wrap: anywhere;
   }
 }
 
@@ -352,7 +362,7 @@
   .link { color: var(--brand); text-decoration: none; }
   .link:hover { text-decoration: underline; }
 
-  .prose-body { white-space: pre-wrap; line-height: 1.75; color: var(--ink-2); }
+  .prose-body { white-space: pre-wrap; line-height: 1.75; color: var(--ink-2); overflow-wrap: anywhere; }
 
   /* ── Прогресс ───────────────────────────────────────────────────── */
   .track {
