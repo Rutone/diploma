@@ -51,6 +51,11 @@
   --radius: 0.5rem;
 
   --sidebar-w: 265px;
+
+  /* Сургуулийн лого нь хар хөх бичигтэй тул харанхуй горимд цагаан самбар дээр тавина. */
+  --logo-plate: transparent;
+  --logo-pad: 0;
+  --logo-pad-mark: 0;
 }
 
 :root[data-theme="dark"],
@@ -91,6 +96,9 @@
 
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);
     --shadow-lg: 0 4px 22px rgba(0, 0, 0, 0.45);
+    --logo-plate: #ffffff;
+    --logo-pad: 7px 10px;
+    --logo-pad-mark: 5px 7px;
     color-scheme: dark;
   }
 }
@@ -127,6 +135,9 @@
 
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);
   --shadow-lg: 0 4px 22px rgba(0, 0, 0, 0.45);
+  --logo-plate: #ffffff;
+  --logo-pad: 7px 10px;
+  --logo-pad-mark: 5px 7px;
   color-scheme: dark;
 }
 
@@ -870,6 +881,21 @@
     padding: 22px 24px 16px;
   }
 
+  /* Сургуулийн лого (дарвал нүүр хуудас руу). Бүтэн лого нь өргөн, хураасан
+     цэсэнд зөвхөн сүлд харагдана. */
+  .side-logo {
+    flex: 1;
+    min-width: 0;
+    display: block;
+    padding: var(--logo-pad);
+    background: var(--logo-plate);
+    border-radius: 10px;
+    line-height: 0;
+  }
+  .side-logo:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+  .logo-full { display: block; width: 100%; max-width: 210px; height: auto; }
+  .logo-mark { display: none; height: 46px; width: auto; margin: 0 auto; }
+
   /* Хураах товч нь aside-ийн (overflow:auto) ГАДНА, ирмэг дээр нь хөвнө —
      эс бөгөөс aside өөрөө хүрээнээс гарсан хэсгийг таслана. */
   .side-toggle { display: none; }
@@ -930,6 +956,9 @@
     :root[data-sidebar="collapsed"] .nav-sub { display: none; }
 
     :root[data-sidebar="collapsed"] .side-head { justify-content: center; padding: 22px 0 16px; }
+    :root[data-sidebar="collapsed"] .side-logo { flex: 0 0 auto; padding: var(--logo-pad-mark); }
+    :root[data-sidebar="collapsed"] .logo-full { display: none; }
+    :root[data-sidebar="collapsed"] .logo-mark { display: block; }
 
     :root[data-sidebar="collapsed"] .nav-item {
       position: relative;

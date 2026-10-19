@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -61,19 +62,6 @@ function leafActive(path: string, href: string): boolean {
   if (href === "/") return path === "/" || (path.startsWith("/initiatives/") && path !== "/initiatives/new");
   if (href === "/requests") return path === "/requests" || (path.startsWith("/requests/") && path !== "/requests/new");
   return path === href || path.startsWith(href + "/");
-}
-
-/* ── Эмблем.  Бодит систем дээр сургуулийн албан ёсны лого тавина. ── */
-function Emblem() {
-  return (
-    <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden className="shrink-0">
-      <rect width="40" height="40" rx="9" fill="var(--brand-btn)" />
-      <path d="M20 9.5 29 13v7.4c0 5.1-3.6 9.3-9 10.6-5.4-1.3-9-5.5-9-10.6V13l9-3.5Z"
-        fill="none" stroke="#fff" strokeWidth="1.7" strokeLinejoin="round" />
-      <path d="m15.6 20.2 3 3 5.8-6.4" fill="none" stroke="var(--gold)"
-        strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
 }
 
 export default function Shell({
@@ -204,20 +192,33 @@ export default function Shell({
 
       <aside className="sidebar" data-open={open}>
         <div className="side-head">
-          <Emblem />
-          <div className="side-label min-w-0 flex-1">
-            <div
-              className="text-[11.5px] font-bold leading-[1.35] uppercase"
-              style={{ color: "var(--brand-ink)" }}
-            >
-              Санал, санаачилгын
-              <br />
-              цахим платформ
-            </div>
-            <div className="text-[9.5px] text-ink3 leading-tight mt-1 uppercase tracking-wide">
-              Feedback &amp; initiative platform
-            </div>
-          </div>
+          {/* Сургуулийн лого — дарвал нүүр хуудас руу. Хураасан цэсэнд зөвхөн сүлд. */}
+          <Link
+            href="/"
+            className="side-logo"
+            aria-label="ШУТИС — нүүр хуудас руу очих"
+            title="Нүүр хуудас"
+            onClick={() => setOpen(false)}
+          >
+            <Image
+              src="/logo-must.webp"
+              alt="ШУТИС — Монгол Улсын Шинжлэх Ухаан Технологийн Их Сургууль"
+              width={800}
+              height={140}
+              className="logo-full"
+              priority
+              unoptimized
+            />
+            <Image
+              src="/logo-must-mark.webp"
+              alt=""
+              width={73}
+              height={136}
+              className="logo-mark"
+              priority
+              unoptimized
+            />
+          </Link>
 
           <button
             className="icon-btn lg:hidden -mr-2"
