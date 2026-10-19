@@ -97,9 +97,11 @@ export default async function Home({
 
           {!user && (
             <div className="mt-4">
-              <Link href="/auth/login" className="btn btn-primary">
+              {/* Энгийн <a>: /auth/login нь cookie тавьдаг route handler тул Next-ийн
+                  <Link> prefetch хийвэл нэвтрэлтийн state-ийг дарж алдаа гаргана. */}
+              <a href="/auth/login" className="btn btn-primary">
                 Нэвтрэх
-              </Link>
+              </a>
             </div>
           )}
 

@@ -9,6 +9,14 @@ import { setSsoState } from "@/lib/auth/session";
  * httpOnly cookie-д хадгалж, буцаж ирэхэд тулгана.
  */
 export async function GET(req: NextRequest) {
+  // Next.js-ийн <Link> холбоосыг урьдчилан ачаалдаг (prefetch). Тийм хүсэлт
+  // бүр шинэ state үүсгэж cookie-г дарвал хэрэглэгчийн ЖИНХЭНЭ нэвтрэлтийн
+  // state алдагдаж, callback дээр «хүсэлт хүчингүй» алдаа гарна. Иймд
+  // prefetch хүсэлтэд юу ч тавихгүй, шууд татгалзана.
+  if (req.headers.has("next-router-prefetch") || req.headers.get("purpose") === "prefetch") {
+    return new NextResponse(null, { status: 204 });
+  }
+
   const state = randomState();
   await setSsoState(state);
 

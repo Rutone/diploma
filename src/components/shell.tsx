@@ -317,9 +317,11 @@ export default function Shell({
                 </form>
               </div>
             ) : (
-              <Link href="/auth/login" className="btn btn-primary btn-sm">
+              // Энгийн <a>: /auth/login нь cookie тавьдаг route handler тул <Link>-ийн
+              // prefetch нэвтрэлтийн state-ийг дарж алдаа гаргана.
+              <a href="/auth/login" className="btn btn-primary btn-sm">
                 Нэвтрэх
-              </Link>
+              </a>
             )}
           </div>
 
