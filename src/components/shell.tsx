@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { logout } from "@/app/actions";
 import Footer from "./footer";
 import {
-  IconHome, IconMegaphone, IconBook, IconShield, IconUsers,
-  IconMenu, IconClose, IconMoon, IconSun, IconUser, IconCalendar, IconPlus,
-  IconClock, IconChart, IconLogout, IconInbox, IconDesk,
-  IconPanelCollapse, IconPanelExpand,
+  IconHome, IconMegaphone, IconBook, IconShield, IconBulb,
+  IconMenu, IconClose, IconMoon, IconSun, IconUser, IconCalendar,
+  IconClock, IconChart, IconLogout, IconInbox, IconArrowRight, IconChevronDown,
 } from "./icons";
 import type { Role } from "@/lib/prisma";
 
@@ -48,11 +47,27 @@ function titleFor(path: string) {
   return "Санал, санаачилга";
 }
 
+/* ── Цэсний бүтэц ────────────────────────────────────────────────────
+   Порталын (student.must.edu.mn) цэс шиг: дан холбоос болон сумтай
+   dropdown бүлгүүд. Бүлгийн дотор цэгтэй дэд мөрүүд байна.            */
+
+type NavLeaf = { href: string; label: string; count?: number };
+type NavEntry =
+  | { kind: "link"; key: string; label: string; icon: ReactNode; leaf: NavLeaf }
+  | { kind: "group"; key: string; label: string; icon: ReactNode; children: NavLeaf[] };
+
+/** Дэд мөр идэвхтэй эсэх. `/requests` нь `/requests/new`-ийг агуулдаг тул тусгайлна. */
+function leafActive(path: string, href: string): boolean {
+  if (href === "/") return path === "/" || (path.startsWith("/initiatives/") && path !== "/initiatives/new");
+  if (href === "/requests") return path === "/requests" || (path.startsWith("/requests/") && path !== "/requests/new");
+  return path === href || path.startsWith(href + "/");
+}
+
 /* ── Эмблем.  Бодит систем дээр сургуулийн албан ёсны лого тавина. ── */
 function Emblem() {
   return (
-    <svg width="38" height="38" viewBox="0 0 40 40" aria-hidden>
-      <rect width="40" height="40" rx="9" fill="var(--brand)" />
+    <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden className="shrink-0">
+      <rect width="40" height="40" rx="9" fill="var(--brand-btn)" />
       <path d="M20 9.5 29 13v7.4c0 5.1-3.6 9.3-9 10.6-5.4-1.3-9-5.5-9-10.6V13l9-3.5Z"
         fill="none" stroke="#fff" strokeWidth="1.7" strokeLinejoin="round" />
       <path d="m15.6 20.2 3 3 5.8-6.4" fill="none" stroke="var(--gold)"
@@ -74,6 +89,9 @@ export default function Shell({
 }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
+  /** Хэрэглэгчийн гараар нээсэн/хаасан бүлгүүд. Тохируулаагүй бол идэвхтэй дэд мөртэй бүлэг нээлттэй. */
+  const [toggled, setToggled] = useState<Record<string, boolean>>({});
+
   /**
    * Сэдвийг React-ийн төлөвт хадгалахгүй — DOM дээрх data-theme нь цорын
    * ганц эх сурвалж. Ингэснээр серверийн рендер ба хөтчийн хооронд зөрүү
@@ -114,30 +132,63 @@ export default function Shell({
 
   const isOfficer = user && user.role !== "MEMBER";
 
-  const nav: { href: string; label: string; icon: React.ReactNode; exact?: boolean; count?: number }[] = [
-    { href: "/", label: "Санаачилгууд", icon: <IconHome />, exact: true },
-    ...(user ? [{ href: "/requests", label: "Миний санал, гомдол", icon: <IconInbox /> }] : []),
-    ...(user
-      ? [{ href: "/notifications", label: "Мэдэгдэл", icon: <IconMegaphone />, count: user.unread }]
-      : []),
-    { href: "/stats", label: "Нээлттэй статистик", icon: <IconChart size={21} /> },
-    { href: "/policy", label: "Журам, бодлого", icon: <IconBook /> },
-    ...(user && user.desk !== null
-      ? [{ href: "/unit", label: "Нэгжийн самбар", icon: <IconDesk />, count: user.desk }]
-      : []),
+  const manage: NavLeaf[] = [
+    ...(user && user.desk !== null ? [{ href: "/unit", label: "Нэгжийн самбар", count: user.desk }] : []),
     ...(user && (user.role === "MODERATOR" || user.role === "ADMIN")
-      ? [{ href: "/moderation", label: "Модерацын самбар", icon: <IconShield />, count: user.queue ?? 0 }]
+      ? [{ href: "/moderation", label: "Модерацын самбар", count: user.queue ?? 0 }]
       : []),
-    ...(user && user.role === "ADMIN"
-      ? [{ href: "/admin", label: "Админ самбар", icon: <IconUsers /> }]
+    ...(user && user.role === "ADMIN" ? [{ href: "/admin", label: "Админ самбар" }] : []),
+  ];
+
+  const entries: NavEntry[] = [
+    { kind: "link", key: "home", label: "Нүүр", icon: <IconHome />, leaf: { href: "/", label: "Нүүр" } },
+    ...(user
+      ? [
+          {
+            kind: "group" as const,
+            key: "participate",
+            label: "Оролцоо",
+            icon: <IconBulb />,
+            children: [
+              { href: "/initiatives/new", label: "Санаачилга дэвшүүлэх" },
+              { href: "/requests/new", label: "Санал, гомдол илгээх" },
+              { href: "/requests", label: "Миний санал, гомдол" },
+            ],
+          },
+          {
+            kind: "link" as const,
+            key: "notifications",
+            label: "Мэдэгдэл",
+            icon: <IconMegaphone />,
+            leaf: { href: "/notifications", label: "Мэдэгдэл", count: user.unread },
+          },
+        ]
+      : []),
+    {
+      kind: "group",
+      key: "info",
+      label: "Мэдээлэл",
+      icon: <IconBook />,
+      children: [
+        { href: "/stats", label: "Нээлттэй статистик" },
+        { href: "/policy", label: "Журам, бодлого" },
+      ],
+    },
+    ...(manage.length
+      ? [{ kind: "group" as const, key: "manage", label: "Удирдлага", icon: <IconShield />, children: manage }]
       : []),
   ];
 
-  const active = (href: string, exact?: boolean) => {
-    const base = href.split("?")[0];
-    if (exact) return path === "/";
-    return base !== "/" && path.startsWith(base);
-  };
+  /** Бүлгийн дээрх сумыг дарахад: хураасан үед эхлээд цэсийг задлаад бүлгийг нээнэ. */
+  function onGroupClick(key: string, isOpen: boolean) {
+    const collapsed = document.documentElement.getAttribute("data-sidebar") === "collapsed";
+    if (collapsed) {
+      toggleSidebar();
+      setToggled((t) => ({ ...t, [key]: true }));
+    } else {
+      setToggled((t) => ({ ...t, [key]: !isOpen }));
+    }
+  }
 
   return (
     <div className="shell">
@@ -156,7 +207,7 @@ export default function Shell({
           <Emblem />
           <div className="side-label min-w-0 flex-1">
             <div
-              className="text-[11.5px] font-medium leading-[1.35] uppercase"
+              className="text-[11.5px] font-bold leading-[1.35] uppercase"
               style={{ color: "var(--brand-ink)" }}
             >
               Санал, санаачилгын
@@ -169,17 +220,7 @@ export default function Shell({
           </div>
 
           <button
-            className="icon-btn side-toggle"
-            onClick={toggleSidebar}
-            aria-label="Хажуугийн цэсийг хураах / задлах"
-            title="Хажуугийн цэсийг хураах / задлах"
-          >
-            <span className="only-expanded"><IconPanelCollapse size={19} /></span>
-            <span className="only-collapsed"><IconPanelExpand size={19} /></span>
-          </button>
-
-          <button
-            className="icon-btn lg:hidden -mt-1 -mr-1"
+            className="icon-btn lg:hidden -mr-2"
             onClick={() => setOpen(false)}
             aria-label="Цэсийг хаах"
           >
@@ -187,58 +228,79 @@ export default function Shell({
           </button>
         </div>
 
-        <nav className="py-3 flex-1">
-          {nav.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              className="nav-item"
-              data-active={active(n.href, n.exact)}
-              onClick={() => setOpen(false)}
-              title={n.label}
-            >
-              {n.icon}
-              <span className="side-label">{n.label}</span>
-              {!!n.count && <span className="nav-count">{n.count}</span>}
-            </Link>
-          ))}
+        <nav className="py-2 flex-1" aria-label="Үндсэн цэс">
+          {entries.map((e) => {
+            if (e.kind === "link") {
+              return (
+                <Link
+                  key={e.key}
+                  href={e.leaf.href}
+                  className="nav-item"
+                  data-active={leafActive(path, e.leaf.href)}
+                  onClick={() => setOpen(false)}
+                  title={e.label}
+                >
+                  {e.icon}
+                  <span className="side-label">{e.label}</span>
+                  {!!e.leaf.count && <span className="nav-count">{e.leaf.count}</span>}
+                </Link>
+              );
+            }
 
-          {user && (
-            <div className="px-3 mt-3 space-y-2">
-              <Link
-                href="/initiatives/new"
-                className="btn btn-primary w-full"
-                onClick={() => setOpen(false)}
-                title="Санаачилга дэвшүүлэх"
-              >
-                <IconPlus />
-                <span className="side-label">Санаачилга дэвшүүлэх</span>
-              </Link>
-              <Link
-                href="/requests/new"
-                className="btn btn-ghost w-full"
-                onClick={() => setOpen(false)}
-                title="Санал, гомдол илгээх"
-              >
-                <IconInbox size={18} />
-                <span className="side-label">Санал, гомдол илгээх</span>
-              </Link>
-            </div>
-          )}
+            const hasActive = e.children.some((c) => leafActive(path, c.href));
+            const isOpen = toggled[e.key] ?? hasActive;
+            const sum = e.children.reduce((a, c) => a + (c.count ?? 0), 0);
+
+            return (
+              <div key={e.key}>
+                <button
+                  type="button"
+                  className="nav-item"
+                  data-active={hasActive && !isOpen}
+                  aria-expanded={isOpen}
+                  aria-controls={`nav-sub-${e.key}`}
+                  onClick={() => onGroupClick(e.key, isOpen)}
+                  title={e.label}
+                >
+                  {e.icon}
+                  <span className="side-label">{e.label}</span>
+                  {sum > 0 && <span className="nav-count nav-count-group">{sum}</span>}
+                  <IconChevronDown className="nav-chevron" size={16} />
+                </button>
+
+                {isOpen && (
+                  <div id={`nav-sub-${e.key}`} className="nav-sub">
+                    {e.children.map((c) => (
+                      <Link
+                        key={c.href}
+                        href={c.href}
+                        className="nav-sub-item"
+                        data-active={leafActive(path, c.href)}
+                        onClick={() => setOpen(false)}
+                      >
+                        <span>{c.label}</span>
+                        {!!c.count && <span className="nav-count">{c.count}</span>}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
-        {/* Порталын доод картуудын хэв маяг */}
-        <div className="p-3 space-y-2 border-t border-line">
+        {/* Порталын доод мөрүүд: «2026-2027 Намар», «VII долоо хоног» шиг */}
+        <div className="p-3 pb-5 space-y-1">
           <div className="side-tile" title="Дэмжлэг цуглуулж буй санаачилга">
             <span className="tile-icon">
-              <IconChart size={18} />
+              <IconChart size={20} />
             </span>
             <div className="side-label leading-tight min-w-0">
-              <div className="text-[14px] font-medium">{stats.collecting} цуглуулж буй</div>
-              <div className="text-[11.5px] text-ink3">Санаачилга</div>
+              <div className="text-[14px] font-semibold">{stats.collecting} цуглуулж буй</div>
+              <div className="text-[12px] text-ink3 mt-0.5">Санаачилга</div>
             </div>
           </div>
-          <div className="side-tile">
+          <div className="side-tile" title="Хугацаа хэтэрсэн хүсэлт">
             <span
               className="tile-icon"
               style={
@@ -247,95 +309,103 @@ export default function Shell({
                   : undefined
               }
             >
-              <IconClock size={18} />
+              <IconClock size={20} />
             </span>
             <div className="side-label leading-tight min-w-0">
               <div
-                className="text-[14px] font-medium"
+                className="text-[14px] font-semibold"
                 style={stats.overdue > 0 ? { color: "var(--bad)" } : undefined}
               >
                 {stats.overdue} хоцорсон
               </div>
-              <div className="text-[11.5px] text-ink3">Хугацаа хэтэрсэн хүсэлт</div>
+              <div className="text-[12px] text-ink3 mt-0.5">Хугацаа хэтэрсэн хүсэлт</div>
             </div>
           </div>
-          <div className="side-tile" title="Дэмжлэг цуглуулж буй санаачилга">
+          <div className="side-tile" title="Хугацаандаа хариулсан хувь">
             <span className="tile-icon">
-              <IconInbox size={18} />
+              <IconInbox size={20} />
             </span>
             <div className="side-label leading-tight min-w-0">
-              <div className="text-[14px] font-medium">
+              <div className="text-[14px] font-semibold">
                 {stats.onTime === null ? "—" : `${stats.onTime}%`} хугацаандаа
               </div>
-              <div className="text-[11.5px] text-ink3">Хариу өгөлт</div>
+              <div className="text-[12px] text-ink3 mt-0.5">Хариу өгөлт</div>
             </div>
           </div>
         </div>
       </aside>
 
+      {/* Хураах товч нь aside-ийн ГАДНА (aside нь overflow-тай тул хүрээнээс гарсан хэсгийг таслана). */}
+      <button
+        type="button"
+        className="side-toggle"
+        onClick={toggleSidebar}
+        aria-label="Хажуугийн цэсийг хураах / задлах"
+        title="Хажуугийн цэсийг хураах / задлах"
+      >
+        <IconArrowRight size={14} />
+      </button>
+
       {/* ── Үндсэн хэсэг ── */}
       <div className="flex-1 min-w-0 flex flex-col">
         <header className="topbar">
-          {/* Мөр 1: мэдэгдэл + хэрэглэгч */}
-          <div className="flex items-center gap-3 px-4 sm:px-6 py-2.5 border-b border-line">
+          {/* Мөр 1: тохиргоо + хэрэглэгч (порталын толгойн хэв маяг) */}
+          <div className="flex items-center gap-2 px-4 sm:px-8 h-[74px] border-b border-line">
             <button
-              className="icon-btn lg:hidden"
+              className="hdr-btn lg:hidden"
               onClick={() => setOpen(true)}
               aria-label="Цэс нээх"
             >
-              <IconMenu />
+              <IconMenu size={26} />
             </button>
 
-            <p className="text-[12.5px] text-ink3 leading-tight flex-1 min-w-0 hidden sm:block">
-              Санаачилга, санал, гомдол бүрт хариуцагч
-              <br className="hidden xl:block" /> хугацаанд нь бичгээр хариу өгөх үүрэгтэй
-            </p>
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                className="hdr-btn"
+                onClick={toggleTheme}
+                aria-label="Гэрэлт / харанхуй горим солих"
+                title="Гэрэлт / харанхуй горим солих"
+              >
+                <span className="only-light"><IconMoon size={28} /></span>
+                <span className="only-dark"><IconSun size={28} /></span>
+              </button>
 
-            <button
-              className="icon-btn"
-              onClick={toggleTheme}
-              aria-label="Гэрэлт / харанхуй горим солих"
-              title="Гэрэлт / харанхуй горим солих"
-            >
-              <span className="only-light"><IconMoon /></span>
-              <span className="only-dark"><IconSun /></span>
-            </button>
-
-            {user ? (
-              <div className="flex items-center gap-2.5">
-                <div className="text-right leading-tight hidden sm:block">
-                  <div className="text-[13.5px] font-medium">{user.short}</div>
-                  <div className="text-[11.5px] text-ink3">{user.meta}</div>
+              {user ? (
+                <div className="flex items-center gap-3">
+                  <div className="text-right leading-tight hidden sm:block">
+                    <div className="text-[13.5px] font-semibold">{user.short}</div>
+                    <div className="text-[12px] text-ink3 mt-0.5">{user.meta}</div>
+                  </div>
+                  <span className="user-chip" aria-hidden>
+                    <IconUser size={22} />
+                  </span>
+                  <form action={logout}>
+                    <button className="hdr-btn" type="submit" title="Гарах" aria-label="Гарах">
+                      <IconLogout size={24} />
+                    </button>
+                  </form>
                 </div>
-                <span className="avatar">
-                  <IconUser size={19} />
-                </span>
-                <form action={logout}>
-                  <button className="icon-btn" type="submit" title="Гарах" aria-label="Гарах">
-                    <IconLogout />
-                  </button>
-                </form>
-              </div>
-            ) : (
-              // Энгийн <a>: /auth/login нь cookie тавьдаг route handler тул <Link>-ийн
-              // prefetch нэвтрэлтийн state-ийг дарж алдаа гаргана.
-              <a href="/auth/login" className="btn btn-primary btn-sm">
-                Нэвтрэх
-              </a>
-            )}
+              ) : (
+                // Энгийн <a>: /auth/login нь cookie тавьдаг route handler тул <Link>-ийн
+                // prefetch нэвтрэлтийн state-ийг дарж алдаа гаргана.
+                <a href="/auth/login" className="btn btn-primary btn-sm">
+                  Нэвтрэх
+                </a>
+              )}
+            </div>
           </div>
 
           {/* Мөр 2: хуудасны гарчиг + огноо */}
-          <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3">
-            <h1 className="text-[19px] font-medium">{titleFor(path)}</h1>
-            <div className="flex items-center gap-2 text-[13px] text-ink3 whitespace-nowrap">
-              <IconCalendar />
+          <div className="flex items-center justify-between gap-3 px-4 sm:px-8 py-[15px]">
+            <h1 className="text-[18px] font-semibold">{titleFor(path)}</h1>
+            <div className="flex items-center gap-2 text-[14px] font-semibold whitespace-nowrap">
+              <IconCalendar size={16} />
               <span className="hidden sm:inline">{today}</span>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 px-4 sm:px-6 py-5 sm:py-6">
+        <main className="flex-1 px-4 sm:px-8 py-6 sm:py-7">
           <div className="mx-auto max-w-[1180px]">{children}</div>
         </main>
 

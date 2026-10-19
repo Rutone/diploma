@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { prisma } from "@/lib/prisma";
 import { currentUser, userMeta } from "@/lib/auth/session";
@@ -7,6 +8,19 @@ import Shell, { type ShellUser } from "@/components/shell";
 import { MEMBER_TYPES, ROLES } from "@/lib/labels";
 import { unreadCount } from "@/lib/domain/notifications";
 import { ACTIONABLE_STATUSES as REQUEST_ACTIONABLE } from "@/lib/domain/requests";
+
+/**
+ * Фонт — ШУТИС-ийн оюутны портал (student.must.edu.mn) Inter ашигладаг.
+ *
+ * `cyrillic-ext` ЗААВАЛ: монгол хэлний Ө, Ү, ө, ү үсгүүд Cyrillic Extended
+ * хэсэгт (U+04AE, U+04E8 …) байдаг. Үүнгүй бол эдгээр үсэг өөр фонтоор
+ * зурагдаж, үг дунд нь хэв маяг зөрнө.
+ */
+const inter = Inter({
+  subsets: ["latin", "cyrillic", "cyrillic-ext"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Санал, санаачилгын цахим платформ",
@@ -82,7 +96,7 @@ export default async function RootLayout({
     : null;
 
   return (
-    <html lang="mn" suppressHydrationWarning>
+    <html lang="mn" className={inter.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: BOOT_SCRIPT }} />
       </head>

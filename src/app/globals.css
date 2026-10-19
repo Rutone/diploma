@@ -2,43 +2,55 @@
 
 /* ────────────────────────────────────────────────────────────────
    Өнгөний тогтолцоо.
-   ШУТИС-ийн оюутны порталын (student.must.edu.mn) дизайн хэлтэй
-   нийцүүлэв: цайвар цэнхэр дэвсгэр, сүүдэртэй цагаан карт,
-   гүн хөх өнгө, хар хөх бичвэр.
+
+   ШУТИС-ийн оюутны порталын (student.must.edu.mn) дизайн хэлтэй яг
+   нийцүүлэв. Порталын CSS-ээс (Metronic) авсан утгууд:
+     үндсэн өнгө #1B84FF · текст #071437 · хүрээ #F1F1F4
+     саарал шкал #F9F9F9 … #4B5675 · фонт Inter · радиус 0.475rem
+     харанхуй горим: дэвсгэр #15171C, текст #F5F5F5, хүрээ #26272F
+
+   Нэг ялгаа — зориуд: порталын #1B84FF нь цагаан дээр 3.63:1 контрастай
+   тул WCAG AA (4.5:1)-д хүрдэггүй. Тайлангийн NFR-10 AA шаарддаг тул
+   ТЕКСТ болон ТОВЧНЫ дэвсгэрт ижил сэнжтэй арай гүн хувилбарыг
+   (--brand-ink, --brand-btn) ашиглаж, харин дүрс, зураас, прогресст
+   порталын өөрийнх нь өнгийг (--brand) хэвээр үлдээв.
    ──────────────────────────────────────────────────────────────── */
 :root {
-  --paper: #f2f6fc;
+  --paper: #f9f9f9;
   --surface: #ffffff;
-  --surface-2: #f7f9fd;
+  --surface-2: #f4f5f7;
   --sidebar: #ffffff;
 
-  --ink: #1e2f45;
-  --ink-2: #46607d;
-  --ink-3: #8496ab;
+  --ink: #071437;
+  --ink-2: #4b5675;
+  --ink-3: #636d86;
 
-  --line: #e4eaf4;
-  --line-2: #cfd9e8;
+  --line: #f1f1f4;
+  --line-2: #dbdfe9;
 
-  --brand: #174f9f;
-  --brand-2: #0f3872;
-  --brand-soft: #e9f0fb;
-  --brand-ink: #113c7d;
+  --brand: #1b84ff;
+  --brand-btn: #1272ea;
+  --brand-2: #0c65d9;
+  --brand-soft: #e9f3ff;
+  --brand-ink: #0c65d9;
   --gold: #f0b71f;
 
-  --ok: #157a4f;
-  --ok-soft: #e3f4eb;
-  --warn: #9a6410;
-  --warn-soft: #fdf2dd;
-  --bad: #a52a2a;
-  --bad-soft: #fceaea;
-  --info: #17609c;
-  --info-soft: #e6f0f9;
-  --violet: #5b3fa8;
-  --violet-soft: #eeeafa;
+  --ok: #077a33;
+  --ok-soft: #e3f9eb;
+  --warn: #8a6400;
+  --warn-soft: #fff8dd;
+  --bad: #d6124a;
+  --bad-soft: #ffeef3;
+  --info: #0c65d9;
+  --info-soft: #e9f3ff;
+  --violet: #6a2ee0;
+  --violet-soft: #f3eefe;
 
-  --shadow: 0 1px 2px rgba(20, 45, 85, 0.05), 0 2px 8px rgba(20, 45, 85, 0.05);
-  --shadow-lg: 0 4px 20px rgba(20, 45, 85, 0.1);
-  --radius: 14px;
+  --shadow: 0 1px 2px rgba(7, 20, 55, 0.04), 0 0 20px rgba(76, 87, 125, 0.04);
+  --shadow-lg: 0 4px 24px rgba(7, 20, 55, 0.12);
+  --radius: 0.5rem;
+
+  --sidebar-w: 265px;
 }
 
 :root[data-theme="dark"],
@@ -48,33 +60,34 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #0f1620;
-    --surface: #18212e;
-    --surface-2: #1e2836;
-    --sidebar: #18212e;
+    --paper: #15171c;
+    --surface: #1c1e24;
+    --surface-2: #22252c;
+    --sidebar: #1a1c21;
 
-    --ink: #e6edf6;
-    --ink-2: #a5b6cb;
-    --ink-3: #7387a0;
+    --ink: #f5f5f5;
+    --ink-2: #b7bbcb;
+    --ink-3: #8d92a5;
 
-    --line: #27323f;
-    --line-2: #354354;
+    --line: #26272f;
+    --line-2: #353844;
 
-    --brand: #77aaf0;
-    --brand-2: #a0c5f8;
-    --brand-soft: #1b2b42;
-    --brand-ink: #b7d3fb;
+    --brand: #3d95ff;
+    --brand-btn: #3d95ff;
+    --brand-2: #6fb1ff;
+    --brand-soft: #172a45;
+    --brand-ink: #6fb1ff;
 
-    --ok: #5fcb97;
-    --ok-soft: #132c20;
-    --warn: #e5b463;
-    --warn-soft: #2e2512;
-    --bad: #ef8b8b;
-    --bad-soft: #33191a;
-    --info: #79bbec;
-    --info-soft: #12283a;
-    --violet: #b6a2ec;
-    --violet-soft: #221c38;
+    --ok: #4cd68c;
+    --ok-soft: #12281c;
+    --warn: #f0c14b;
+    --warn-soft: #2b2410;
+    --bad: #ff7a9a;
+    --bad-soft: #33141c;
+    --info: #6fb1ff;
+    --info-soft: #172a45;
+    --violet: #b39dff;
+    --violet-soft: #231c3a;
 
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);
     --shadow-lg: 0 4px 22px rgba(0, 0, 0, 0.45);
@@ -83,33 +96,34 @@
 }
 
 :root[data-theme="dark"] {
-  --paper: #0f1620;
-  --surface: #18212e;
-  --surface-2: #1e2836;
-  --sidebar: #18212e;
+  --paper: #15171c;
+  --surface: #1c1e24;
+  --surface-2: #22252c;
+  --sidebar: #1a1c21;
 
-  --ink: #e6edf6;
-  --ink-2: #a5b6cb;
-  --ink-3: #7387a0;
+  --ink: #f5f5f5;
+  --ink-2: #b7bbcb;
+  --ink-3: #8d92a5;
 
-  --line: #27323f;
-  --line-2: #354354;
+  --line: #26272f;
+  --line-2: #353844;
 
-  --brand: #77aaf0;
-  --brand-2: #a0c5f8;
-  --brand-soft: #1b2b42;
-  --brand-ink: #b7d3fb;
+  --brand: #3d95ff;
+  --brand-btn: #3d95ff;
+  --brand-2: #6fb1ff;
+  --brand-soft: #172a45;
+  --brand-ink: #6fb1ff;
 
-  --ok: #5fcb97;
-  --ok-soft: #132c20;
-  --warn: #e5b463;
-  --warn-soft: #2e2512;
-  --bad: #ef8b8b;
-  --bad-soft: #33191a;
-  --info: #79bbec;
-  --info-soft: #12283a;
-  --violet: #b6a2ec;
-  --violet-soft: #221c38;
+  --ok: #4cd68c;
+  --ok-soft: #12281c;
+  --warn: #f0c14b;
+  --warn-soft: #2b2410;
+  --bad: #ff7a9a;
+  --bad-soft: #33141c;
+  --info: #6fb1ff;
+  --info-soft: #172a45;
+  --violet: #b39dff;
+  --violet-soft: #231c3a;
 
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);
   --shadow-lg: 0 4px 22px rgba(0, 0, 0, 0.45);
@@ -117,6 +131,7 @@
 }
 
 @theme inline {
+  --font-sans: var(--font-inter), Inter, "Segoe UI", Roboto, "Noto Sans", system-ui, sans-serif;
   --color-paper: var(--paper);
   --color-surface: var(--surface);
   --color-surface2: var(--surface-2);
@@ -145,7 +160,7 @@
   body {
     background: var(--paper);
     color: var(--ink);
-    font-family: "Segoe UI", Roboto, "Noto Sans", system-ui, -apple-system, Arial, sans-serif;
+    font-family: var(--font-inter), Inter, "Segoe UI", Roboto, "Noto Sans", system-ui, -apple-system, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     line-height: 1.65;
     /* Хэрэглэгчийн бичсэн дунд зайгүй урт үг (холбоос, санамсаргүй тэмдэгт мөр)
@@ -174,7 +189,7 @@
   }
 
   .sidebar {
-    width: 264px;
+    width: var(--sidebar-w);
     flex-shrink: 0;
     background: var(--sidebar);
     border-right: 1px solid var(--line);
@@ -186,50 +201,92 @@
     overflow-y: auto;
   }
 
+  /* Цэсний мөр — порталын (Metronic) хэв маяг: тод (600) бичвэр, саарал дүрс,
+     идэвхтэй үед цайвар цэнхэр дэвсгэр + цэнхэр бичвэр. */
   .nav-item {
     display: flex;
     align-items: center;
     gap: 13px;
-    padding: 10px 14px;
-    margin: 1px 12px;
-    border-radius: 9px;
+    width: calc(100% - 32px);
+    padding: 9px 12px;
+    margin: 2px 16px;
+    border-radius: 8px;
+    color: var(--ink);
+    font-size: 14.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    text-decoration: none;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .nav-item:hover { background: var(--surface-2); }
+  .nav-item[data-active="true"] { background: var(--brand-soft); color: var(--brand-ink); }
+  .nav-item svg { flex-shrink: 0; color: var(--ink-3); }
+  .nav-item[data-active="true"] svg { color: var(--brand); }
+
+  /* Dropdown бүлэг: сумыг эргүүлж нээж/хаана. */
+  .nav-chevron { margin-left: auto; flex-shrink: 0; transition: transform 0.2s; color: var(--ink-3); }
+  .nav-item[aria-expanded="true"] .nav-chevron { transform: rotate(180deg); }
+  .nav-count + .nav-chevron { margin-left: 8px; }
+  /* Бүлгийн нийлбэр тоолуур: нээлттэй үед дэд мөрүүд өөрсдөө тоогоо үзүүлнэ. */
+  .nav-item[aria-expanded="true"] .nav-count-group { display: none; }
+
+  /* Дэд цэс: цэгтэй мөр. Идэвхтэй нь цэнхэр цэг + цайвар цэнхэр дэвсгэр. */
+  .nav-sub { margin: 2px 0 4px; }
+  .nav-sub-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: calc(100% - 32px);
+    margin: 1px 16px;
+    padding: 8px 12px 8px 20px;
+    border-radius: 8px;
     color: var(--ink-2);
-    font-size: 15px;
+    font-size: 14px;
+    font-weight: 500;
     text-decoration: none;
     transition: background 0.15s, color 0.15s;
   }
-  .nav-item:hover { background: var(--surface-2); color: var(--ink); }
-  .nav-item[data-active="true"] {
-    background: var(--brand-soft);
-    color: var(--brand-ink);
-    font-weight: 500;
+  .nav-sub-item::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--line-2);
+    flex-shrink: 0;
+    margin-right: 3px;
   }
-  .nav-item svg { flex-shrink: 0; color: var(--brand); }
-  .nav-item[data-active="true"] svg { color: var(--brand-ink); }
+  .nav-sub-item:hover { background: var(--surface-2); color: var(--ink); }
+  .nav-sub-item[data-active="true"] { background: var(--brand-soft); color: var(--brand-ink); font-weight: 600; }
+  .nav-sub-item[data-active="true"]::before { background: var(--brand); }
 
   .topbar {
     background: var(--surface);
     border-bottom: 1px solid var(--line);
+    box-shadow: 0 1px 0 rgba(7, 20, 55, 0.01);
     position: sticky;
     top: 0;
     z-index: 30;
   }
 
-  /* Хажуугийн жижиг мэдээллийн хайрцаг (порталын доод картын хэв маяг) */
+  /* Хажуугийн доод мэдээллийн мөр — порталын «2026-2027 Намар», «VII долоо хоног»
+     шиг: хүрээгүй, цайвар цэнхэр дөрвөлжин дүрстэй, тод гарчигтай. */
   .side-tile {
     display: flex;
     align-items: center;
-    gap: 11px;
-    padding: 10px 12px;
-    border-radius: 11px;
-    background: var(--surface-2);
-    border: 1px solid var(--line);
+    gap: 13px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    background: transparent;
   }
   .side-tile .tile-icon {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     flex-shrink: 0;
-    border-radius: 9px;
+    border-radius: 8px;
     background: var(--brand-soft);
     color: var(--brand);
     display: grid;
@@ -249,7 +306,7 @@
   .sec-title {
     text-align: center;
     font-size: 15px;
-    font-weight: 500;
+    font-weight: 600;
     margin: -20px -20px 16px;
     padding: 13px 16px;
     border-bottom: 1px solid var(--line);
@@ -260,7 +317,7 @@
   .card-title {
     text-align: center;
     font-size: 15px;
-    font-weight: 500;
+    font-weight: 600;
     padding: 14px 16px;
     border-bottom: 1px solid var(--line);
     color: var(--ink);
@@ -269,7 +326,7 @@
   .avatar {
     width: 38px;
     height: 38px;
-    border-radius: 999px;
+    border-radius: 8px;
     background: var(--brand-soft);
     color: var(--brand-ink);
     display: grid;
@@ -285,9 +342,9 @@
     align-items: center;
     gap: 6px;
     padding: 3px 10px;
-    border-radius: 999px;
+    border-radius: 6px;
     font-size: 12.5px;
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.55;
     white-space: nowrap;
   }
@@ -305,16 +362,16 @@
     justify-content: center;
     gap: 8px;
     padding: 9px 18px;
-    border-radius: 999px;
-    font-size: 15px;
-    font-weight: 500;
+    border-radius: 8px;
+    font-size: 14.5px;
+    font-weight: 600;
     border: 1px solid transparent;
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s, opacity 0.15s;
     text-decoration: none;
   }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn-primary { background: var(--brand); color: #fff; }
+  .btn-primary { background: var(--brand-btn); color: #fff; }
   :root[data-theme="dark"] .btn-primary { color: #0e1a2b; }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) .btn-primary { color: #0e1a2b; }
@@ -328,7 +385,7 @@
   .icon-btn {
     width: 38px;
     height: 38px;
-    border-radius: 999px;
+    border-radius: 8px;
     display: grid;
     place-items: center;
     color: var(--ink-2);
@@ -344,7 +401,7 @@
     width: 100%;
     background: var(--surface);
     border: 1px solid var(--line-2);
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 10px 13px;
     font-size: 15px;
     color: var(--ink);
@@ -356,10 +413,10 @@
     border-color: transparent;
   }
   .textarea { line-height: 1.65; resize: vertical; }
-  .label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+  .label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
   .hint { font-size: 13px; color: var(--ink-3); margin-top: 6px; }
 
-  .link { color: var(--brand); text-decoration: none; }
+  .link { color: var(--brand-ink); text-decoration: none; }
   .link:hover { text-decoration: underline; }
 
   .prose-body { white-space: pre-wrap; line-height: 1.75; color: var(--ink-2); overflow-wrap: anywhere; }
@@ -462,7 +519,7 @@
     gap: 12px;
     padding: 14px 16px;
     border: 1px solid var(--line-2);
-    border-radius: 12px;
+    border-radius: 8px;
     background: var(--surface);
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
@@ -553,7 +610,7 @@
   .tabs { display: flex; flex-wrap: wrap; gap: 6px; }
   .tab {
     padding: 6px 14px;
-    border-radius: 999px;
+    border-radius: 8px;
     font-size: 13.5px;
     border: 1px solid var(--line);
     background: var(--surface-2);
@@ -797,7 +854,7 @@
   }
 }
 
-/* ═══ Хажуугийн цэсийг хураах ══════════════════════════════════════
+/* ═══ Хажуугийн цэс: толгой, хураах товч ═══════════════════════════
    Төлөв нь <html data-sidebar="collapsed"> дээр хадгалагдана. React-ийн
    төлөвт биш DOM дээр байдаг учир серверийн рендертэй зөрөхгүй, хуудас
    ачаалахад анивчихгүй (layout.tsx дахь BOOT_SCRIPT).
@@ -808,58 +865,85 @@
 @layer components {
   .side-head {
     display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 16px;
-    border-bottom: 1px solid var(--line);
+    align-items: center;
+    gap: 12px;
+    padding: 22px 24px 16px;
   }
 
-  /* Хураах товч нь зөвхөн өргөн дэлгэцэд хэрэгтэй. */
+  /* Хураах товч нь aside-ийн (overflow:auto) ГАДНА, ирмэг дээр нь хөвнө —
+     эс бөгөөс aside өөрөө хүрээнээс гарсан хэсгийг таслана. */
   .side-toggle { display: none; }
 
-  .only-expanded,
-  .only-collapsed { display: grid; place-items: center; }
-  .only-collapsed { display: none; }
+  /* Толгойн том дүрсэн товчнууд (порталын сар, хэрэглэгчийн дүрс). */
+  .hdr-btn {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    color: var(--ink);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .hdr-btn:hover { background: var(--surface-2); }
+  .user-chip {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border: 2px solid var(--ink);
+    border-radius: 10px;
+    color: var(--ink);
+    flex-shrink: 0;
+  }
 
   @media (min-width: 1024px) {
-    .sidebar {
-      transition: width 0.2s ease;
-    }
+    .sidebar { transition: width 0.2s ease; }
+
     .side-toggle {
       display: grid;
-      margin: -2px -4px 0 0;
-      flex-shrink: 0;
+      place-items: center;
+      position: fixed;
+      top: 38px;
+      left: calc(var(--sidebar-w) - 13px);
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--line-2);
+      color: var(--ink-2);
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      z-index: 45;
+      transition: left 0.2s ease, color 0.15s, border-color 0.15s;
     }
-
-    :root[data-sidebar="collapsed"] .sidebar { width: 68px; }
+    .side-toggle:hover { color: var(--brand-ink); border-color: var(--brand); }
+    /* Задарсан үед ← (хураана), хураасан үед → (задална). */
+    .side-toggle svg { transform: rotate(180deg); }
+    :root[data-sidebar="collapsed"] .side-toggle svg { transform: none; }
 
     /* Хураасан үед зөвхөн дүрс үлдэнэ. */
-    :root[data-sidebar="collapsed"] .side-label { display: none; }
+    :root[data-sidebar="collapsed"] .side-label,
+    :root[data-sidebar="collapsed"] .nav-chevron,
+    :root[data-sidebar="collapsed"] .nav-sub { display: none; }
 
-    :root[data-sidebar="collapsed"] .only-expanded { display: none; }
-    :root[data-sidebar="collapsed"] .only-collapsed { display: grid; }
+    :root[data-sidebar="collapsed"] .side-head { justify-content: center; padding: 22px 0 16px; }
 
-    /* Толгой — тэмдэг ба товч босоо тэнхлэгт эгнэнэ. */
-    :root[data-sidebar="collapsed"] .side-head {
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      padding: 14px 8px;
-    }
-    :root[data-sidebar="collapsed"] .side-toggle { margin: 0; }
-
-    /* Цэсийн мөр — дүрс голлоно, тоолуур нь өнцөгт жижиг тэмдэг болно. */
     :root[data-sidebar="collapsed"] .nav-item {
       position: relative;
       justify-content: center;
       gap: 0;
-      margin: 1px 10px;
-      padding: 10px 0;
+      width: 48px;
+      margin: 2px auto;
+      padding: 11px 0;
     }
+    :root[data-sidebar="collapsed"] .nav-item[aria-expanded="true"] .nav-count-group { display: block; }
     :root[data-sidebar="collapsed"] .nav-count {
       position: absolute;
-      top: 3px;
-      right: 3px;
+      top: 2px;
+      right: 0;
       margin: 0;
       min-width: 17px;
       padding: 0 4px;
@@ -867,26 +951,28 @@
       line-height: 16px;
     }
 
-    /* Үйлдлийн товчнууд — дөрвөлжин, зөвхөн дүрстэй. */
-    :root[data-sidebar="collapsed"] nav .btn {
-      width: 44px;
-      height: 40px;
-      min-width: 0;
-      padding: 0;
-      margin: 0 auto;
-      gap: 0;
-    }
-    :root[data-sidebar="collapsed"] nav > div { padding-inline: 0; }
-
-    /* Доод мэдээллийн хайрцгууд — зөвхөн дүрс. */
     :root[data-sidebar="collapsed"] .side-tile {
       justify-content: center;
       gap: 0;
-      padding: 8px;
+      padding: 7px 0;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .sidebar { transition: none; }
+    .sidebar, .side-toggle, .nav-chevron { transition: none; }
   }
+}
+
+/* ЗААВАЛ давхаргагүй (unlayered): --sidebar-w-ийн үндсэн утга нь дээрх :root
+   дотор давхаргагүй тул @layer дотор бичсэн дарж өгөх дүрэм хэзээ ч ялахгүй. */
+@media (min-width: 1024px) {
+  :root[data-sidebar="collapsed"] { --sidebar-w: 76px; }
+}
+
+/* Хүснэгтийн толгой — порталын нэгэн адил тод (600), хар хөх. Утга нь
+   хуудас бүрт Tailwind-ийн `font-normal text-ink3` utility-аар бичигдсэн
+   тул давхаргагүй (unlayered) дүрмээр дарна. */
+main table th {
+  font-weight: 600;
+  color: var(--ink);
 }

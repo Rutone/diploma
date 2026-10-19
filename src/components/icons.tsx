@@ -305,3 +305,10 @@ export const IconPanelExpand = ({ size = 20, className }: P) => (
     <path d="m5.7 10.5 1.6 1.5-1.6 1.5" />
   </svg>
 );
+
+/** Dropdown цэсний суман (нимгэн). Нээгдсэн үед CSS-ээр эргэнэ. */
+export const IconChevronDown = ({ size = 16, className }: P) => (
+  <svg {...base(size)} className={className} strokeWidth={1.9}>
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+);
