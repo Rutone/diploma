@@ -13,6 +13,17 @@ import type { VercelConfig } from "@vercel/config/v1";
  */
 export const config: VercelConfig = {
   framework: "nextjs",
+  /**
+   * Функцийг өгөгдлийн сантай НЭГ бүсэд (Singapore) ажиллуулна.
+   *
+   * Хуудас бүр өгөгдлийн сан руу хэд хэдэн дараалсан хүсэлт явуулдаг тул
+   * функц ба сан хоёр өөр тив дээр байвал хүсэлт бүр далайг дамжиж, хуудас
+   * хэд дахин удаашрана. Vercel-ийн анхдагч бүс нь Washington D.C. (iad1)
+   * тул тодорхой заахгүй бол Singapore-т үүсгэсэн сантай зөрнө.
+   *
+   * Neon сангийн бүсийг өөрчилбөл энийг мөн хамт өөрчилнө.
+   */
+  regions: ["sin1"],
   crons: [{ path: "/api/cron/daily", schedule: "0 17 * * *" }],
 };
 

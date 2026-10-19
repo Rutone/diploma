@@ -201,13 +201,25 @@ NFR-13-ын дагуу босго (`p`, `T_min`, `q`), хугацаа, анги�
 
 Vercel-ийн самбар → **Storage** → **Create Database** → **Neon** (Postgres).
 
-Үүсгэсний дараа Vercel төсөлд холболтын хувьсагчдыг автоматаар нэмнэ.
-Тэдгээрээс хоёрыг ялгаж тэмдэглэнэ:
+Сонгох зүйлс:
 
-| Төрөл | Тайлбар |
+| Талбар | Утга | Шалтгаан |
+|---|---|---|
+| Region | **Singapore** (`sin1`) | Монголд хамгийн ойр. `vercel.ts` дахь функцийн бүстэй ЗААВАЛ таарна |
+| Auth | **Унтраах** | Манайх өөрийн нэвтрэлттэй, хэрэггүй |
+| Realtime | Унтраалттай | Хэрэггүй |
+| Plan | **Free** | 1 GB, манайд хангалттай |
+
+> Сангийн бүс болон `vercel.ts` дахь `regions: ["sin1"]` нь **ижил** байх
+> ёстой. Хуудас бүр өгөгдлийн сан руу хэд хэдэн дараалсан хүсэлт явуулдаг тул
+> функц, сан хоёр өөр тив дээр байвал хуудас хэд дахин удаашрана.
+
+Үүсгэсний дараа Neon integration төсөлд холболтын хувьсагчдыг **өөрөө** нэмнэ:
+
+| Хувьсагч | Тайлбар |
 |---|---|
-| **Pooled** (`-pooler` агуулсан) | Програм ажиллах үед ашиглана |
-| **Direct / unpooled** | Нүүлгэлт (migration) болон seed-д ашиглана |
+| `DATABASE_URL` | **Pooled** — програм ажиллах үед ашиглана |
+| `DATABASE_URL_UNPOOLED` | **Direct** — нүүлгэлтэд ашиглана (`prisma.config.ts` өөрөө таниж авна) |
 
 ### 2. Төслийг импортлох
 
@@ -218,16 +230,18 @@ Vercel-ийн самбар → **Storage** → **Create Database** → **Neon** 
 > байршуулалт амжилтгүй болно.
 > Settings → Git → Production Branch → `ftest`.
 
+Өгөгдлийн санг төсөлтэй холбоогүй бол: Storage → тухайн сан → **Connect Project**.
+
 ### 3. Орчны хувьсагч
 
-Settings → Environment Variables:
+Settings → Environment Variables дээр **гараар нэмэх** хоёр:
 
 | Нэр | Утга |
 |---|---|
-| `DATABASE_URL` | Neon-ы **pooled** холболтын мөр |
-| `DIRECT_DATABASE_URL` | Neon-ы **direct** холболтын мөр |
 | `SSO_MOCK_SECRET` | Санамсаргүй урт тэмдэгт мөр |
 | `CRON_SECRET` | Санамсаргүй урт тэмдэгт мөр |
+
+`DATABASE_URL`, `DATABASE_URL_UNPOOLED` хоёр аль хэдийн байгаа эсэхийг шалгана.
 
 Санамсаргүй нууц үүсгэх:
 
@@ -246,8 +260,10 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 Нэг удаа, өөрийн компьютерээс production сан руу:
 
 ```bash
-DATABASE_URL="<direct холболтын мөр>" npm run seed
+DATABASE_URL="<DATABASE_URL_UNPOOLED-ийн утга>" npm run seed
 ```
+
+Утгыг Vercel → Storage → тухайн сан → `.env.local` табаас авна.
 
 > **Анхаар:** seed скрипт нь өгөгдлийн санг бүхэлд нь **цэвэрлэж** эхэлдэг.
 > Build-ийн явцад хэзээ ч ажиллуулахгүй.

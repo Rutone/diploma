@@ -19,9 +19,16 @@ export default defineConfig({
      * зөвлөмжийн түгжээ (advisory lock) ашигладаг бөгөөд холболтын сан
      * (PgBouncer гэх мэт) үүнийг дамжуулдаггүй.
      *
-     * Иймээс DIRECT_DATABASE_URL тохируулсан бол түүнийг, эс бөгөөс
-     * энгийн DATABASE_URL-ийг ашиглана. Дотоод хөгжүүлэлтэд ялгаагүй.
+     * Дараах дарааллаар сонгоно:
+     *   1. DIRECT_DATABASE_URL         — гараар тохируулсан
+     *   2. DATABASE_URL_UNPOOLED       — Vercel-ийн Neon integration өгдөг
+     *   3. POSTGRES_URL_NON_POOLING    — Vercel-ийн Postgres нийтлэг нэр
+     *   4. DATABASE_URL                — дотоод хөгжүүлэлт (pooler байхгүй)
      */
-    url: process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL,
+    url:
+      process.env.DIRECT_DATABASE_URL ||
+      process.env.DATABASE_URL_UNPOOLED ||
+      process.env.POSTGRES_URL_NON_POOLING ||
+      process.env.DATABASE_URL,
   },
 });
