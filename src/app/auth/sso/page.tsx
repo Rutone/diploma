@@ -6,7 +6,7 @@ import {
   TEST_ROLE_ORDER,
 } from "@/lib/auth/test-accounts";
 import { Notice } from "@/components/ui";
-import { IconArrowRight, IconUser } from "@/components/icons";
+import { IconArrowRight, IconChevronDown, IconUser } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -76,38 +76,47 @@ export default async function LoginPage({
         хангалттай. Доорх бүртгэлээс сонгоход тухайн эрхээр шууд нэвтэрнэ.
       </Notice>
 
+      {/* Эрх тус бүр dropdown: хаалттай үед зөвхөн нэр, сумыг дарвал бүртгэлүүд задарна.
+          Native <details> тул JS-гүй ажиллаж, гар (Enter/Space) болон дэлгэц уншигчид нийцнэ. */}
       {byGroup.map(({ group, meta, items }) => (
-        <section key={group} className="card p-4 sm:p-5">
-          <h3 className="sec-title">{meta.label}</h3>
-          <p className="hint mt-1 mb-3">{meta.hint}</p>
+        <details key={group} className="card acc">
+          <summary className="acc-head">
+            <span className="acc-title">{meta.label}</span>
+            <span className="acc-chevron" aria-hidden>
+              <IconChevronDown size={18} />
+            </span>
+          </summary>
 
-          <div className="grid gap-2">
-            {items.map((a) => (
-              <form key={a.code} method="post" action="/auth/sso/authorize">
-                <input type="hidden" name="userCode" value={a.code} />
-                <input type="hidden" name="state" value={state} />
-                <input type="hidden" name="redirect_uri" value={redirectUri} />
-                <button type="submit" className="choice w-full text-left">
-                  <span className="choice-icon">
-                    <IconUser size={19} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-baseline justify-between gap-x-3">
-                      <span className="font-medium text-[14.5px]">{a.name}</span>
-                      <code className="text-[13px] text-ink3 tabular-nums">{a.code}</code>
+          <div className="acc-body">
+            <p className="hint mb-3">{meta.hint}</p>
+            <div className="grid gap-2">
+              {items.map((a) => (
+                <form key={a.code} method="post" action="/auth/sso/authorize">
+                  <input type="hidden" name="userCode" value={a.code} />
+                  <input type="hidden" name="state" value={state} />
+                  <input type="hidden" name="redirect_uri" value={redirectUri} />
+                  <button type="submit" className="choice w-full text-left">
+                    <span className="choice-icon">
+                      <IconUser size={19} />
                     </span>
-                    <span className="hint block">
-                      {a.position}
-                      {a.schoolCode ? ` · ${a.schoolCode}` : ""}
-                      {a.year ? ` · ${a.year}-р курс` : ""}
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+                        <span className="font-medium text-[14.5px]">{a.name}</span>
+                        <code className="text-[13px] text-ink3 tabular-nums">{a.code}</code>
+                      </span>
+                      <span className="hint block">
+                        {a.position}
+                        {a.schoolCode ? ` · ${a.schoolCode}` : ""}
+                        {a.year ? ` · ${a.year}-р курс` : ""}
+                      </span>
+                      <span className="hint block mt-0.5">{a.hint}</span>
                     </span>
-                    <span className="hint block mt-0.5">{a.hint}</span>
-                  </span>
-                </button>
-              </form>
-            ))}
+                  </button>
+                </form>
+              ))}
+            </div>
           </div>
-        </section>
+        </details>
       ))}
 
       {/* ── Кодоор нэвтрэх ── */}

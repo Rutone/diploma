@@ -1005,3 +1005,49 @@ main table th {
   font-weight: 600;
   color: var(--ink);
 }
+
+/* ═══ Accordion (нэвтрэх хуудасны эрхийн бүлгүүд) ═════════════════
+   Native <details>: хаалттай үед зөвхөн нэр + сум, нээхэд бүртгэлүүд.
+   Сум нь дугуй товч хэлбэртэй — дарж болохыг тод мэдрүүлнэ.        */
+@layer components {
+  .acc { padding: 0; overflow: hidden; }
+
+  .acc-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px 12px 18px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .acc-head::-webkit-details-marker { display: none; }
+  .acc-head:hover { background: var(--surface-2); }
+  .acc-head:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+
+  .acc-title { font-size: 15px; font-weight: 600; color: var(--ink); }
+
+  .acc-chevron {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    border: 1px solid var(--line-2);
+    background: var(--surface);
+    color: var(--ink-2);
+    transition: transform 0.2s ease, background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .acc-head:hover .acc-chevron { background: var(--brand-soft); color: var(--brand-ink); border-color: var(--brand); }
+  .acc[open] > .acc-head { border-bottom: 1px solid var(--line); }
+  .acc[open] .acc-chevron { transform: rotate(180deg); background: var(--brand-soft); color: var(--brand-ink); border-color: var(--brand); }
+
+  .acc-body { padding: 14px 16px 16px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .acc-chevron { transition: none; }
+  }
+}
