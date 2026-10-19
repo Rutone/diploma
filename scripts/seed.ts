@@ -14,8 +14,10 @@
  *
  * `--if-empty` нь Vercel-ийн build дотор ашиглагдана: анхны байршуулалтад
  * сан хоосон тул жишээ өгөгдлөөр дүүргэж, дараагийн байршуулалт бүрт
- * хэрэглэгч байгааг хараад ЮУ Ч ХИЙХГҮЙ. Ингэснээр бодит өгөгдөл
- * хэзээ ч устахгүй, холболтын нууц үгийг гараар дамжуулах шаардлагагүй.
+ * хэрэглэгч байгааг хараад өгөгдөлд ХҮРЭХГҮЙ (зөвхөн нэвтрэх хуудасны
+ * дутуу туршилтын бүртгэлийг нэмнэ — ensureTestAccounts). Ингэснээр бодит
+ * өгөгдөл хэзээ ч устахгүй, холболтын нууц үгийг гараар дамжуулах
+ * шаардлагагүй.
  */
 
 import "dotenv/config";
@@ -112,6 +114,41 @@ function personName(i: number): string {
   return `${pick(SURNAME_INITIALS, i * 7)}. ${pick(FIRST_NAMES, i * 3 + (i % 5))}`;
 }
 
+/**
+ * Сан аль хэдийн өгөгдөлтэй үед нэвтрэх хуудасны туршилтын бүртгэлийг л нөхнө.
+ * Байгаа бүртгэл, түүний санал, санаачилгад ХҮРЭХГҮЙ — зөвхөн кодоор нь
+ * хайж, олдоогүйг нь нэмнэ. Тиймээс test-accounts.ts-д бүртгэл нэмэхэд
+ * өгөгдлийг цэвэрлэхгүйгээр production-д ч тусна.
+ */
+async function ensureTestAccounts(): Promise<number> {
+  const [schools, units, present] = await Promise.all([
+    prisma.school.findMany(),
+    prisma.unit.findMany(),
+    prisma.user.findMany({
+      where: { code: { in: TEST_ACCOUNTS.map((a) => a.code) } },
+      select: { code: true },
+    }),
+  ]);
+  const schoolId = new Map(schools.map((s) => [s.code, s.id]));
+  const unitId = new Map(units.map((u) => [u.code, u.id]));
+  const have = new Set(present.map((u) => u.code));
+
+  const data = TEST_ACCOUNTS.filter((a) => !have.has(a.code)).map((a) => ({
+    ssoSub: `must-sso-${a.code}`,
+    code: a.code,
+    name: a.name,
+    email: `${a.code.toLowerCase()}@must.edu.mn`,
+    memberType: a.memberType,
+    role: a.role,
+    schoolId: a.schoolCode ? (schoolId.get(a.schoolCode) ?? null) : null,
+    unitId: a.unitCode ? (unitId.get(a.unitCode) ?? null) : null,
+    position: a.position,
+    year: a.year ?? 0,
+  }));
+  if (data.length > 0) await prisma.user.createMany({ data, skipDuplicates: true });
+  return data.length;
+}
+
 /* ═══ Үндсэн урсгал ══════════════════════════════════════════════ */
 
 async function main() {
@@ -121,6 +158,8 @@ async function main() {
     const existing = await prisma.user.count();
     if (existing > 0) {
       console.log(`Сан хоосон биш (${existing.toLocaleString("mn-MN")} хэрэглэгч). Seed алгасав.`);
+      const added = await ensureTestAccounts();
+      if (added > 0) console.log(`Нэвтрэх хуудасны дутуу ${added} туршилтын бүртгэл нэмэв.`);
       return;
     }
     console.log("Сан хоосон байна — жишээ өгөгдлөөр дүүргэнэ.");
