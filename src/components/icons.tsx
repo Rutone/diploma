@@ -319,3 +319,13 @@ export const IconSearch = ({ size = 18, className }: P) => (
     <path d="m20 20-4.2-4.2" />
   </svg>
 );
+
+export const IconScale = ({ size = 21, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M12 4v16" />
+    <path d="M8 20h8" />
+    <path d="M5 7h14" />
+    <path d="M5 7 2.5 13a2.5 2.5 0 0 0 5 0L5 7Z" />
+    <path d="m19 7-2.5 6a2.5 2.5 0 0 0 5 0L19 7Z" />
+  </svg>
+);

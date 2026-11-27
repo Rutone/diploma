@@ -434,8 +434,30 @@
   }
   .choice:hover { background: var(--surface-2); }
   /* Нүүр хуудасны хоёр том товч — картын сүүдэртэй, арай өргөн зайтай. */
-  .home-choice { padding: 18px 20px; box-shadow: var(--shadow); border-color: var(--line); }
+  .home-choice { align-items: center; gap: 16px; padding: 18px 20px; box-shadow: var(--shadow); border-color: var(--line); }
   .home-choice:hover { border-color: var(--brand); background: var(--surface); }
+  .home-choice-title { font-size: 16px; font-weight: 600; color: var(--ink); }
+  /* Сүлд, тамга маягийн дугуй дүрс: хар хөх хүрээ, гадна нь шар цагираг. */
+  .seal {
+    width: 52px;
+    height: 52px;
+    margin: 4px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 2px solid var(--seal-ring);
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+    color: var(--seal-ring);
+    transition: transform 0.2s;
+  }
+  .seal[data-tone="gold"] { background: var(--seal-gold); }
+  .seal[data-tone="blue"] { background: var(--brand-soft); }
+  .home-choice:hover .seal { transform: rotate(-8deg) scale(1.05); }
+  @media (prefers-reduced-motion: reduce) {
+    .seal { transition: none; }
+  }
   .choice:has(input:checked) {
     border-color: var(--brand);
     background: var(--brand-soft);
@@ -1381,3 +1403,10 @@ main table th {
   }
   .policy-sub:first-child { padding-top: 0; }
 }
+
+/* Сүлдний өнгө: гэрэлт горимд хар хөх, харанхуйд цайвар — хүрээ хоёуланд нь тод харагдана. */
+:root { --seal-ring: #0a1638; --seal-gold: #faeeda; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --seal-ring: #dfe5f3; --seal-gold: #33290f; }
+}
+:root[data-theme="dark"] { --seal-ring: #dfe5f3; --seal-gold: #33290f; }

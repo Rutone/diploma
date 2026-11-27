@@ -4,7 +4,7 @@ import { currentUser } from "@/lib/auth/session";
 import { listInitiatives } from "@/lib/domain/initiatives";
 import { AUDIENCES, INITIATIVE_TABS } from "@/lib/labels";
 import { InitiativeCard, Empty, Notice, type InitiativeCardData } from "@/components/ui";
-import { IconBulb, IconInbox } from "@/components/icons";
+import { IconFlag, IconScale } from "@/components/icons";
 import InitiativeFilters from "@/components/initiative-filters";
 import { ListToggleArea, ListToggleProvider } from "@/components/list-toggle";
 import { fmtNum } from "@/lib/format";
@@ -79,21 +79,22 @@ export default async function Home({
           Гарчиг толгойд, тоонууд статистикт, нэвтрэх товч цэсэнд байгаа тул энд зөвхөн
           хоёр үйлдэл үлдэнэ. Нэвтрээгүй хүнийг хоёр хуудас хоёулаа нэвтрэх рүү шилжүүлнэ. */}
       <nav className="grid sm:grid-cols-2 gap-3" aria-label="Хүсэлт илгээх">
+        {/* Сургуулийн сүлд, тамга маягийн дугуй дүрс: хар хөх хүрээ + шар цагираг. */}
         <Link href="/initiatives/new" className="choice home-choice">
-          <span className="choice-icon">
-            <IconBulb size={20} />
+          <span className="seal" data-tone="gold" aria-hidden>
+            <IconFlag size={24} />
           </span>
           <div>
-            <div className="font-medium text-[15px]">Санаачилга</div>
+            <div className="home-choice-title">Санаачилга</div>
             <div className="hint">Олон хүнд хамаатай өөрчлөлт — дэмжлэг цуглуулна</div>
           </div>
         </Link>
         <Link href="/requests/new" className="choice home-choice">
-          <span className="choice-icon">
-            <IconInbox size={20} />
+          <span className="seal" data-tone="blue" aria-hidden>
+            <IconScale size={24} />
           </span>
           <div>
-            <div className="font-medium text-[15px]">Санал, гомдол</div>
+            <div className="home-choice-title">Санал, гомдол</div>
             <div className="hint">Хувийн шинжтэй — нэгжид шууд очно</div>
           </div>
         </Link>
