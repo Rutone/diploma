@@ -18,7 +18,7 @@ function Section({
 }) {
   return (
     <section id={id} className="card p-5 sm:p-6 scroll-mt-4">
-      <h3 className="text-[17px] font-medium mb-3">{title}</h3>
+      <h3 className="policy-title">{title}</h3>
       <div className="space-y-3 text-[14.5px] text-ink2 leading-relaxed">{children}</div>
     </section>
   );

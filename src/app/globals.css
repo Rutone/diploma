@@ -1317,8 +1317,33 @@ main table th {
   }
 }
 
-/* Журмын хуудасны хэсэг доторх дэд гарчиг. */
+/* Журмын хуудас: хэсгийн гарчиг том, доороо зураастай; дэд гарчиг нь
+   жижиг, цэнхэр, зүүн талдаа босоо зурвастай — хоёр түвшин тод ялгарна. */
 @layer components {
-  .policy-sub { font-size: 15px; font-weight: 600; color: var(--ink); padding-top: 6px; }
+  .policy-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ink);
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .policy-sub {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-top: 8px;
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--brand-ink);
+  }
+  .policy-sub::before {
+    content: "";
+    width: 4px;
+    height: 16px;
+    border-radius: 2px;
+    background: var(--brand);
+    flex-shrink: 0;
+  }
   .policy-sub:first-child { padding-top: 0; }
 }
