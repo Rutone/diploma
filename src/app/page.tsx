@@ -200,24 +200,6 @@ export default async function Home({
           </Link>
         )}
 
-        <div className="card p-4 space-y-3">
-          <h3 className="sec-title">Систем хэрхэн ажилладаг вэ</h3>
-          <ol className="steps">
-            {[
-              "Гишүүн санаачилга бичиж, хамрах хүрээгээ сонгоод модераторт илгээнэ.",
-              "Модератор агуулгын дүрэм болон хамрах хүрээг шалгаж батална.",
-              "Систем хамрах хүрээний гишүүдийн тооноос босгыг автоматаар тооцно.",
-              "Гишүүд санаачилгыг нэг удаа дэмжинэ. Босгод хүрвэл хариуцсан нэгжид шилжинэ.",
-              "Нэгж хуульд нийцсэн хугацаанд албан хариу өгнө. Хоцрогдол нийтэд ил харагдана.",
-            ].map((s, i) => (
-              <li key={i} className="step">
-                <span className="step-dot">{i + 1}</span>
-                <span>{s}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-
         <div className="grid grid-cols-2 gap-2">
           <StatTile label="Нийт гишүүн" value={members} tone="blue" />
           <StatTile label="Санаачилга" value={counts.reduce((a, b) => a + b, 0)} />
