@@ -3,13 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { logout } from "@/app/actions";
 import Footer from "./footer";
 import {
-  IconHome, IconMegaphone, IconBook, IconShield, IconBulb,
   IconMenu, IconClose, IconMoon, IconSun, IconUser, IconCalendar,
-  IconClock, IconChart, IconLogout, IconInbox, IconArrowRight, IconChevronDown,
+  IconClock, IconChart, IconLogout, IconInbox, IconChevronDown,
 } from "./icons";
 import type { Role } from "@/lib/prisma";
 
@@ -49,13 +48,14 @@ function titleFor(path: string) {
 }
 
 /* ── Цэсний бүтэц ────────────────────────────────────────────────────
-   Порталын (student.must.edu.mn) цэс шиг: дан холбоос болон сумтай
-   dropdown бүлгүүд. Бүлгийн дотор цэгтэй дэд мөрүүд байна.            */
+   ШУТИС-ийн сайтуудын (жишээ нь эрдэм шинжилгээний мэдээллийн систем)
+   дээд цэс шиг: цагаан толгойн доор хар хөх мөр, том үсэгтэй холбоосууд,
+   сумтай бүлэг нь доош нээгдэх цэс. Идэвхтэй мөрийн доор шар зураас.   */
 
 type NavLeaf = { href: string; label: string; count?: number };
 type NavEntry =
-  | { kind: "link"; key: string; label: string; icon: ReactNode; leaf: NavLeaf }
-  | { kind: "group"; key: string; label: string; icon: ReactNode; children: NavLeaf[] };
+  | { kind: "link"; key: string; label: string; leaf: NavLeaf }
+  | { kind: "group"; key: string; label: string; children: NavLeaf[] };
 
 /** Дэд мөр идэвхтэй эсэх. `/requests` нь `/requests/new`-ийг агуулдаг тул тусгайлна. */
 function leafActive(path: string, href: string): boolean {
@@ -76,9 +76,33 @@ export default function Shell({
   children: React.ReactNode;
 }) {
   const path = usePathname();
-  const [open, setOpen] = useState(false);
-  /** Хэрэглэгчийн гараар нээсэн/хаасан бүлгүүд. Тохируулаагүй бол идэвхтэй дэд мөртэй бүлэг нээлттэй. */
-  const [toggled, setToggled] = useState<Record<string, boolean>>({});
+  /** Гар утсан дээрх цэс нээлттэй эсэх. */
+  const [mobileOpen, setMobileOpen] = useState(false);
+  /** Нээлттэй байгаа доош нээгдэх бүлэг. */
+  const [menu, setMenu] = useState<string | null>(null);
+  const navRef = useRef<HTMLElement>(null);
+
+  // Цэсний гадна дарах эсвэл Esc дарахад нээлттэй бүлгийг хаана.
+  useEffect(() => {
+    if (!menu) return;
+    function onDown(e: PointerEvent) {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) setMenu(null);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenu(null);
+    }
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
+
+  function closeAll() {
+    setMenu(null);
+    setMobileOpen(false);
+  }
 
   /**
    * Сэдвийг React-ийн төлөвт хадгалахгүй — DOM дээрх data-theme нь цорын
@@ -100,24 +124,6 @@ export default function Shell({
     }
   }
 
-  /**
-   * Хажуугийн цэсийг хураах / задлах. Сэдвийн товчтой ижил зарчмаар
-   * DOM дээрх data-sidebar нь цорын ганц эх сурвалж болно — React-ийн
-   * төлөвт хадгалбал серверийн рендертэй зөрөх эрсдэлтэй.
-   */
-  function toggleSidebar() {
-    const root = document.documentElement;
-    const next = root.getAttribute("data-sidebar") === "collapsed" ? null : "collapsed";
-    if (next) root.setAttribute("data-sidebar", next);
-    else root.removeAttribute("data-sidebar");
-    try {
-      if (next) localStorage.setItem("sidebar", next);
-      else localStorage.removeItem("sidebar");
-    } catch {
-      /* хувийн горимд хадгалагдахгүй байж болно */
-    }
-  }
-
   const isOfficer = user && user.role !== "MEMBER";
 
   const manage: NavLeaf[] = [
@@ -129,14 +135,13 @@ export default function Shell({
   ];
 
   const entries: NavEntry[] = [
-    { kind: "link", key: "home", label: "Нүүр", icon: <IconHome />, leaf: { href: "/", label: "Нүүр" } },
+    { kind: "link", key: "home", label: "Нүүр", leaf: { href: "/", label: "Нүүр" } },
     ...(user
       ? [
           {
             kind: "group" as const,
             key: "participate",
             label: "Оролцоо",
-            icon: <IconBulb />,
             children: [
               { href: "/initiatives/new", label: "Санаачилга дэвшүүлэх" },
               { href: "/requests/new", label: "Санал, гомдол илгээх" },
@@ -147,7 +152,6 @@ export default function Shell({
             kind: "link" as const,
             key: "notifications",
             label: "Мэдэгдэл",
-            icon: <IconMegaphone />,
             leaf: { href: "/notifications", label: "Мэдэгдэл", count: user.unread },
           },
         ]
@@ -156,262 +160,182 @@ export default function Shell({
       kind: "group",
       key: "info",
       label: "Мэдээлэл",
-      icon: <IconBook />,
       children: [
         { href: "/stats", label: "Нээлттэй статистик" },
         { href: "/policy", label: "Журам, бодлого" },
       ],
     },
     ...(manage.length
-      ? [{ kind: "group" as const, key: "manage", label: "Удирдлага", icon: <IconShield />, children: manage }]
+      ? [{ kind: "group" as const, key: "manage", label: "Удирдлага", children: manage }]
       : []),
   ];
 
-  /** Бүлгийн дээрх сумыг дарахад: хураасан үед эхлээд цэсийг задлаад бүлгийг нээнэ. */
-  function onGroupClick(key: string, isOpen: boolean) {
-    const collapsed = document.documentElement.getAttribute("data-sidebar") === "collapsed";
-    if (collapsed) {
-      toggleSidebar();
-      setToggled((t) => ({ ...t, [key]: true }));
-    } else {
-      setToggled((t) => ({ ...t, [key]: !isOpen }));
-    }
-  }
-
   return (
     <div className="shell">
-      {/* ── Хажуугийн цэс ── */}
-      {open && (
-        <div
-          className="fixed inset-0 z-40 lg:hidden"
-          style={{ background: "rgba(15,30,55,.45)" }}
-          onClick={() => setOpen(false)}
-          aria-hidden
-        />
-      )}
-
-      <aside className="sidebar" data-open={open}>
-        <div className="side-head">
-          {/* Сургуулийн лого — дарвал нүүр хуудас руу. Хураасан цэсэнд зөвхөн сүлд. */}
-          <Link
-            href="/"
-            className="side-logo"
-            aria-label="ШУТИС — нүүр хуудас руу очих"
-            title="Нүүр хуудас"
-            onClick={() => setOpen(false)}
-          >
+      {/* ── Толгой: лого + системийн нэр ── */}
+      <header className="site-head">
+        <div className="site-wrap site-head-row">
+          <Link href="/" className="head-logo" aria-label="ШУТИС — нүүр хуудас руу очих" title="Нүүр хуудас">
             <Image
               src="/logo-must.webp"
               alt="ШУТИС — Монгол Улсын Шинжлэх Ухаан Технологийн Их Сургууль"
               width={800}
               height={140}
-              className="logo-full"
-              priority
-              unoptimized
-            />
-            <Image
-              src="/logo-must-mark.webp"
-              alt=""
-              width={73}
-              height={136}
-              className="logo-mark"
               priority
               unoptimized
             />
           </Link>
 
+          <div className="head-title">
+            <span className="head-title-main">санал, санаачилгын</span>{" "}
+            <span className="head-title-sub">цахим платформ</span>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Хар хөх цэсний мөр ── */}
+      <nav ref={navRef} className="mainnav" aria-label="Үндсэн цэс">
+        <div className="site-wrap mainnav-row">
           <button
-            className="icon-btn lg:hidden -mr-2"
-            onClick={() => setOpen(false)}
-            aria-label="Цэсийг хаах"
+            type="button"
+            className="mainnav-burger"
+            onClick={() => setMobileOpen((o) => !o)}
+            aria-expanded={mobileOpen}
+            aria-controls="mainnav-list"
+            aria-label={mobileOpen ? "Цэсийг хаах" : "Цэс нээх"}
           >
-            <IconClose size={20} />
+            {mobileOpen ? <IconClose size={22} /> : <IconMenu size={22} />}
+            <span>Цэс</span>
           </button>
-        </div>
 
-        <nav className="py-2 flex-1" aria-label="Үндсэн цэс">
-          {entries.map((e) => {
-            if (e.kind === "link") {
-              return (
-                <Link
-                  key={e.key}
-                  href={e.leaf.href}
-                  className="nav-item"
-                  data-active={leafActive(path, e.leaf.href)}
-                  onClick={() => setOpen(false)}
-                  title={e.label}
-                >
-                  {e.icon}
-                  <span className="side-label">{e.label}</span>
-                  {!!e.leaf.count && <span className="nav-count">{e.leaf.count}</span>}
-                </Link>
-              );
-            }
-
-            const hasActive = e.children.some((c) => leafActive(path, c.href));
-            const isOpen = toggled[e.key] ?? hasActive;
-            const sum = e.children.reduce((a, c) => a + (c.count ?? 0), 0);
-
-            return (
-              <div key={e.key}>
-                <button
-                  type="button"
-                  className="nav-item"
-                  data-active={hasActive && !isOpen}
-                  aria-expanded={isOpen}
-                  aria-controls={`nav-sub-${e.key}`}
-                  onClick={() => onGroupClick(e.key, isOpen)}
-                  title={e.label}
-                >
-                  {e.icon}
-                  <span className="side-label">{e.label}</span>
-                  {sum > 0 && <span className="nav-count nav-count-group">{sum}</span>}
-                  <IconChevronDown className="nav-chevron" size={16} />
-                </button>
-
-                {isOpen && (
-                  <div id={`nav-sub-${e.key}`} className="nav-sub">
-                    {e.children.map((c) => (
-                      <Link
-                        key={c.href}
-                        href={c.href}
-                        className="nav-sub-item"
-                        data-active={leafActive(path, c.href)}
-                        onClick={() => setOpen(false)}
-                      >
-                        <span>{c.label}</span>
-                        {!!c.count && <span className="nav-count">{c.count}</span>}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </nav>
-
-        {/* Порталын доод мөрүүд: «2026-2027 Намар», «VII долоо хоног» шиг */}
-        <div className="p-3 pb-5 space-y-1">
-          <div className="side-tile" title="Дэмжлэг цуглуулж буй санаачилга">
-            <span className="tile-icon">
-              <IconChart size={20} />
-            </span>
-            <div className="side-label leading-tight min-w-0">
-              <div className="text-[14px] font-semibold">{stats.collecting} цуглуулж буй</div>
-              <div className="text-[12px] text-ink3 mt-0.5">Санаачилга</div>
-            </div>
-          </div>
-          <div className="side-tile" title="Хугацаа хэтэрсэн хүсэлт">
-            <span
-              className="tile-icon"
-              style={
-                stats.overdue > 0
-                  ? { background: "var(--bad-soft)", color: "var(--bad)" }
-                  : undefined
+          <ul id="mainnav-list" className="mainnav-list" data-open={mobileOpen}>
+            {entries.map((e) => {
+              if (e.kind === "link") {
+                return (
+                  <li key={e.key}>
+                    <Link
+                      href={e.leaf.href}
+                      className="mainnav-item"
+                      data-active={leafActive(path, e.leaf.href)}
+                      onClick={closeAll}
+                    >
+                      {e.label}
+                      {!!e.leaf.count && <span className="nav-count">{e.leaf.count}</span>}
+                    </Link>
+                  </li>
+                );
               }
-            >
-              <IconClock size={20} />
-            </span>
-            <div className="side-label leading-tight min-w-0">
-              <div
-                className="text-[14px] font-semibold"
-                style={stats.overdue > 0 ? { color: "var(--bad)" } : undefined}
-              >
-                {stats.overdue} хоцорсон
-              </div>
-              <div className="text-[12px] text-ink3 mt-0.5">Хугацаа хэтэрсэн хүсэлт</div>
-            </div>
-          </div>
-          <div className="side-tile" title="Хугацаандаа хариулсан хувь">
-            <span className="tile-icon">
-              <IconInbox size={20} />
-            </span>
-            <div className="side-label leading-tight min-w-0">
-              <div className="text-[14px] font-semibold">
-                {stats.onTime === null ? "—" : `${stats.onTime}%`} хугацаандаа
-              </div>
-              <div className="text-[12px] text-ink3 mt-0.5">Хариу өгөлт</div>
-            </div>
-          </div>
-        </div>
-      </aside>
 
-      {/* Хураах товч нь aside-ийн ГАДНА (aside нь overflow-тай тул хүрээнээс гарсан хэсгийг таслана). */}
-      <button
-        type="button"
-        className="side-toggle"
-        onClick={toggleSidebar}
-        aria-label="Хажуугийн цэсийг хураах / задлах"
-        title="Хажуугийн цэсийг хураах / задлах"
-      >
-        <IconArrowRight size={14} />
-      </button>
+              const hasActive = e.children.some((c) => leafActive(path, c.href));
+              const isOpen = menu === e.key;
+              const sum = e.children.reduce((a, c) => a + (c.count ?? 0), 0);
 
-      {/* ── Үндсэн хэсэг ── */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        <header className="topbar">
-          {/* Мөр 1: тохиргоо + хэрэглэгч (порталын толгойн хэв маяг) */}
-          <div className="flex items-center gap-2 px-4 sm:px-8 h-[74px] border-b border-line">
+              return (
+                <li key={e.key} className="mainnav-group">
+                  <button
+                    type="button"
+                    className="mainnav-item"
+                    data-active={hasActive}
+                    aria-expanded={isOpen}
+                    aria-controls={`mainnav-sub-${e.key}`}
+                    onClick={() => setMenu(isOpen ? null : e.key)}
+                  >
+                    {e.label}
+                    {sum > 0 && <span className="nav-count">{sum}</span>}
+                    <IconChevronDown className="mainnav-caret" size={14} />
+                  </button>
+
+                  {isOpen && (
+                    <div id={`mainnav-sub-${e.key}`} className="mainnav-drop">
+                      {e.children.map((c) => (
+                        <Link
+                          key={c.href}
+                          href={c.href}
+                          className="mainnav-drop-item"
+                          data-active={leafActive(path, c.href)}
+                          onClick={closeAll}
+                        >
+                          <span>{c.label}</span>
+                          {!!c.count && <span className="nav-count">{c.count}</span>}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Баруун тал: сэдэв солих, хэрэглэгч / нэвтрэх */}
+          <div className="mainnav-tools">
             <button
-              className="hdr-btn lg:hidden"
-              onClick={() => setOpen(true)}
-              aria-label="Цэс нээх"
+              className="mainnav-icon"
+              onClick={toggleTheme}
+              aria-label="Гэрэлт / харанхуй горим солих"
+              title="Гэрэлт / харанхуй горим солих"
             >
-              <IconMenu size={26} />
+              <span className="only-light"><IconMoon size={20} /></span>
+              <span className="only-dark"><IconSun size={20} /></span>
             </button>
 
-            <div className="flex items-center gap-2 ml-auto">
-              <button
-                className="hdr-btn"
-                onClick={toggleTheme}
-                aria-label="Гэрэлт / харанхуй горим солих"
-                title="Гэрэлт / харанхуй горим солих"
-              >
-                <span className="only-light"><IconMoon size={28} /></span>
-                <span className="only-dark"><IconSun size={28} /></span>
-              </button>
-
-              {user ? (
-                <div className="flex items-center gap-3">
-                  <div className="text-right leading-tight hidden sm:block">
-                    <div className="text-[13.5px] font-semibold">{user.short}</div>
-                    <div className="text-[12px] text-ink3 mt-0.5">{user.meta}</div>
-                  </div>
-                  <span className="user-chip" aria-hidden>
-                    <IconUser size={22} />
-                  </span>
-                  <form action={logout}>
-                    <button className="hdr-btn" type="submit" title="Гарах" aria-label="Гарах">
-                      <IconLogout size={24} />
-                    </button>
-                  </form>
+            {user ? (
+              <>
+                <div className="mainnav-user" title={user.meta}>
+                  <IconUser size={18} />
+                  <span className="hidden sm:inline">{user.short}</span>
                 </div>
-              ) : (
-                // Энгийн <a>: /auth/login нь cookie тавьдаг route handler тул <Link>-ийн
-                // prefetch нэвтрэлтийн state-ийг дарж алдаа гаргана.
-                <a href="/auth/login" className="btn btn-primary btn-sm">
-                  Нэвтрэх
-                </a>
-              )}
+                <form action={logout}>
+                  <button className="mainnav-icon" type="submit" title="Гарах" aria-label="Гарах">
+                    <IconLogout size={20} />
+                  </button>
+                </form>
+              </>
+            ) : (
+              // Энгийн <a>: /auth/login нь cookie тавьдаг route handler тул <Link>-ийн
+              // prefetch нэвтрэлтийн state-ийг дарж алдаа гаргана.
+              <a href="/auth/login" className="mainnav-login">
+                Нэвтрэх
+              </a>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      {/* ── Үндсэн хэсэг ── */}
+      <main className="flex-1 px-4 sm:px-8 py-6 sm:py-7">
+        <div className="mx-auto max-w-[1180px]">
+          {/* Хуудасны гарчиг + системийн товч үзүүлэлт + огноо */}
+          <div className="page-head">
+            <h1 className="text-[19px] font-semibold">{titleFor(path)}</h1>
+            <div className="page-head-meta">
+              <span className="page-stat" title="Дэмжлэг цуглуулж буй санаачилга">
+                <IconChart size={15} />
+                {stats.collecting} цуглуулж буй
+              </span>
+              <span
+                className="page-stat"
+                title="Хугацаа хэтэрсэн хүсэлт"
+                style={stats.overdue > 0 ? { color: "var(--bad)" } : undefined}
+              >
+                <IconClock size={15} />
+                {stats.overdue} хоцорсон
+              </span>
+              <span className="page-stat" title="Хугацаандаа хариулсан хувь">
+                <IconInbox size={15} />
+                {stats.onTime === null ? "—" : `${stats.onTime}%`} хугацаандаа
+              </span>
+              <span className="page-stat page-date">
+                <IconCalendar size={15} />
+                {today}
+              </span>
             </div>
           </div>
 
-          {/* Мөр 2: хуудасны гарчиг + огноо */}
-          <div className="flex items-center justify-between gap-3 px-4 sm:px-8 py-[15px]">
-            <h1 className="text-[18px] font-semibold">{titleFor(path)}</h1>
-            <div className="flex items-center gap-2 text-[14px] font-semibold whitespace-nowrap">
-              <IconCalendar size={16} />
-              <span className="hidden sm:inline">{today}</span>
-            </div>
-          </div>
-        </header>
+          {children}
+        </div>
+      </main>
 
-        <main className="flex-1 px-4 sm:px-8 py-6 sm:py-7">
-          <div className="mx-auto max-w-[1180px]">{children}</div>
-        </main>
-
-        <Footer note={isOfficer ? "удирдлагын эрхээр нэвтэрсэн" : undefined} />
-      </div>
+      <Footer note={isOfficer ? "удирдлагын эрхээр нэвтэрсэн" : undefined} />
     </div>
   );
 }
