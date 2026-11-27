@@ -1313,3 +1313,9 @@ main table th {
     .seg-block { transition: none; }
   }
 }
+
+/* Журмын хуудасны хэсэг доторх дэд гарчиг. */
+@layer components {
+  .policy-sub { font-size: 15px; font-weight: 600; color: var(--ink); padding-top: 6px; }
+  .policy-sub:first-child { padding-top: 0; }
+}

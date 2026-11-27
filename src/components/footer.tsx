@@ -150,7 +150,7 @@ export default function Footer({ note }: { note?: string }) {
         <nav className="site-footer-links" aria-label="Журам, бодлого">
           <Link href="/policy">Журам, бодлого</Link>
           <Link href="/policy#threshold">Дэмжлэгийн босго</Link>
-          <Link href="/policy#legal">Хуулийн хугацаа</Link>
+          <Link href="/policy#legal">Хугацааны зохицуулалт</Link>
           <Link href="/policy#moderation">Модерацийн журам</Link>
           <Link href="/policy#privacy">Нууцлалын бодлого</Link>
           <Link href="/policy#appeal">Давж заалдах</Link>
