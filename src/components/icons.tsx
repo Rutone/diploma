@@ -312,3 +312,10 @@ export const IconChevronDown = ({ size = 16, className }: P) => (
     <path d="m6 9 6 6 6-6" />
   </svg>
 );
+
+export const IconSearch = ({ size = 18, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="m20 20-4.2-4.2" />
+  </svg>
+);
