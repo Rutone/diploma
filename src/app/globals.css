@@ -1173,3 +1173,149 @@ main table th {
     .status-tab { transition: none; }
   }
 }
+
+/* ═══ Статистикийн график ═══════════════════════════════════════════
+   Ангиллын 3 өнгө (оюутан / багш / ажилтан) нь dataviz-ийн шалгуурын
+   скриптээр гэрэлт (#fff) ба харанхуй (#1c1e24) гадаргуу дээр шалгагдсан:
+   өнгөний харалган байдалд ч ялгарна. Нэг хэмжигдэхүүнийг (тоо хэмжээ)
+   нэг өнгөөр — сайтын үндсэн цэнхэр — харуулна.                      */
+:root {
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-seq: #2a78d6;
+  --chart-track: #e9f1fb;
+  --chart-alert: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --chart-1: #3987e5;
+    --chart-2: #d95926;
+    --chart-3: #199e70;
+    --chart-seq: #3987e5;
+    --chart-track: #20304a;
+    --chart-alert: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-seq: #3987e5;
+  --chart-track: #20304a;
+  --chart-alert: #e66767;
+}
+
+@layer components {
+  .hero-figure { font-size: 48px; font-weight: 600; line-height: 1.05; letter-spacing: -0.02em; }
+
+  /* Өндөр хэсэгчилсэн зурвас: блок бүрийн хооронд 2px гадаргуун зай. */
+  .seg-bar { display: flex; gap: 2px; height: 28px; }
+  .seg-block {
+    min-width: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: default;
+    transition: filter 0.15s;
+  }
+  .seg-block:hover, .seg-block:focus-visible { filter: brightness(1.12); outline: none; }
+  .seg-block[data-slot="1"], .legend-swatch[data-slot="1"] { background: var(--chart-1); }
+  .seg-block[data-slot="2"], .legend-swatch[data-slot="2"] { background: var(--chart-2); }
+  .seg-block[data-slot="3"], .legend-swatch[data-slot="3"] { background: var(--chart-3); }
+
+  .chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 13.5px;
+  }
+  .chart-legend li { display: inline-flex; align-items: center; gap: 7px; }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+  /* Хэвтээ баганууд: нэг суурь, суурь тал шулуун, үзүүр 4px дугуй. */
+  .bar-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+  .bar-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "name value" "bar bar";
+    align-items: center;
+    gap: 4px 12px;
+    padding: 6px 8px;
+    margin: 0 -8px;
+    border-radius: 6px;
+    cursor: default;
+  }
+  .bar-row:hover, .bar-row:focus-visible { background: var(--surface-2); outline: none; }
+  .bar-name { grid-area: name; font-size: 13.5px; color: var(--ink-2); }
+  .bar-value { grid-area: value; justify-self: end; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .bar-track { grid-area: bar; display: block; height: 12px; }
+  .bar-fill {
+    display: block;
+    height: 100%;
+    min-width: 4px;
+    background: var(--chart-seq);
+    border-radius: 0 4px 4px 0;
+  }
+  .bar-fill[data-alert="true"] { background: var(--chart-alert); }
+
+  /* Хувь заагч: ижил өнгөний цайвар зам + зорилтын нимгэн зураас. */
+  .meter {
+    position: relative;
+    display: block;
+    height: 10px;
+    margin: 6px 0 4px;
+    border-radius: 999px;
+    background: var(--chart-track);
+  }
+  .meter-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--chart-seq); }
+  .meter-target {
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    width: 2px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--ink);
+  }
+  .meter-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .meter-detail { font-size: 12.5px; color: var(--ink-3); }
+
+  .meter-list { display: grid; gap: 6px 32px; margin: 0; padding: 0; list-style: none; }
+  @media (min-width: 768px) {
+    .meter-list { grid-template-columns: 1fr 1fr; }
+  }
+  .meter-row { padding: 8px 10px; margin: 0 -10px; border-radius: 6px; font-size: 14px; cursor: default; }
+  .meter-row:hover, .meter-row:focus-visible { background: var(--surface-2); outline: none; }
+
+  /* Tooltip: утга тод, нэр нь доор нь. */
+  .chart-tip {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 60;
+    max-width: 280px;
+    padding: 7px 11px;
+    border-radius: 8px;
+    background: var(--ink);
+    color: var(--surface);
+    box-shadow: var(--shadow-lg);
+    pointer-events: none;
+    line-height: 1.35;
+  }
+  .chart-tip[hidden] { display: none; }
+  .chart-tip strong { display: block; font-size: 14px; font-weight: 700; }
+  .chart-tip span { display: block; font-size: 12.5px; opacity: 0.8; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .seg-block { transition: none; }
+  }
+}
