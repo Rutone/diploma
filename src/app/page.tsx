@@ -253,7 +253,7 @@ export default async function Home({
             Их сургууль даяарх санаачилгад N = {fmtNum(members)} тул босго {universityThreshold}{" "}
             байна. Босго батлах үед хөлдөх тул явцын дунд өөрчлөгдөхгүй.
           </p>
-          <Link href="/policy" className="link text-[13.5px] mt-2 inline-block">
+          <Link href="/policy#threshold" className="link text-[13.5px] mt-2 inline-block">
             Бүрэн журам үзэх →
           </Link>
         </div>
