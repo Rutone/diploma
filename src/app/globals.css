@@ -1067,9 +1067,40 @@ main table th {
   }
   @media (max-width: 767px) {
     .filter-bar { grid-template-columns: 1fr 1fr; }
-    .filter-search { grid-column: 1 / -1; }
+    .filter-top { grid-column: 1 / -1; }
   }
 
+  /* Хайлтын мөр: зүүн талд жагсаалт нуух/харуулах товч, баруун талд хайлт. */
+  .filter-top { display: flex; gap: 10px; min-width: 0; }
+  .filter-top .filter-search { flex: 1; }
+  .list-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    padding: 0 12px;
+    border: 1px solid var(--line-2);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink-2);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .list-toggle:hover { background: var(--surface-2); color: var(--ink); }
+  .list-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: -1px; }
+  .list-toggle[aria-expanded="true"] { background: var(--brand-soft); color: var(--brand-ink); border-color: transparent; }
+  .list-toggle[aria-expanded="true"] .status-count { background: var(--surface); color: var(--brand-ink); }
+  .list-toggle-caret { transition: transform 0.2s; }
+  .list-toggle[aria-expanded="true"] .list-toggle-caret { transform: rotate(180deg); }
+  @media (max-width: 479px) {
+    .list-toggle-label, .list-toggle .status-count { display: none; }
+    .list-toggle { padding: 0 10px; gap: 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .list-toggle, .list-toggle-caret { transition: none; }
+  }
   .filter-search {
     display: flex;
     align-items: center;

@@ -2,6 +2,7 @@
 
 import Form from "next/form";
 import { IconSearch } from "./icons";
+import { ListToggleButton } from "./list-toggle";
 
 type Option = { value: string; label: string };
 
@@ -47,19 +48,22 @@ export default function InitiativeFilters({
     >
       <input type="hidden" name="tab" value={tab} />
 
-      <label className="filter-search">
-        <IconSearch />
-        <input
-          type="search"
-          name="q"
-          defaultValue={q}
-          placeholder="Санаачилга хайх…"
-          aria-label="Санаачилга хайх"
-        />
-        <button type="submit" className="filter-search-btn">
-          Хайх
-        </button>
-      </label>
+      <div className="filter-top">
+        <ListToggleButton />
+        <label className="filter-search">
+          <IconSearch />
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            placeholder="Санаачилга хайх…"
+            aria-label="Санаачилга хайх"
+          />
+          <button type="submit" className="filter-search-btn">
+            Хайх
+          </button>
+        </label>
+      </div>
 
       <select
         name="cat"
