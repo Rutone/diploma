@@ -3,8 +3,9 @@ import { prisma, type Audience, type InitiativeStatus } from "@/lib/prisma";
 import { currentUser } from "@/lib/auth/session";
 import { listInitiatives } from "@/lib/domain/initiatives";
 import { AUDIENCES, INITIATIVE_TABS } from "@/lib/labels";
-import { InitiativeCard, Empty, Notice, StatTile, type InitiativeCardData } from "@/components/ui";
-import { IconBulb, IconInbox, IconPlus } from "@/components/icons";
+import { InitiativeCard, Empty, Notice, type InitiativeCardData } from "@/components/ui";
+import { IconBulb, IconInbox } from "@/components/icons";
+import { fmtNum } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -72,139 +73,143 @@ export default async function Home({
   };
 
   return (
-    <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-5 items-start">
-      <div className="space-y-4 min-w-0">
-        {/* ── Танилцуулга ── */}
-        <section className="card p-5">
-          <h2 className="text-[20px] font-medium leading-snug">
-            Санал, санаачилгын цахим платформ
-          </h2>
-          <p className="text-[13px] text-ink3 mt-1">
-            Оюутан · Багш · Ажилтан · Хариуцсан нэгжүүд
-          </p>
-          <p className="text-[14.5px] text-ink2 mt-3 leading-relaxed">
-            Хувийн шинжтэй санал, гомдлоо нууцлалтайгаар хариуцсан нэгжид шууд илгээнэ. Олон хүнд
-            хамаатай асуудлаар нийтийн санаачилга дэвшүүлж дэмжлэг цуглуулна. Тогтоосон босгод
-            хүрсэн санаачилгад хариуцсан нэгж хуульд нийцсэн хугацаанд албан хариу өгөх үүрэг
-            хүлээнэ.
-          </p>
-
-          {!user && (
-            <div className="mt-4">
-              {/* Энгийн <a>: /auth/login нь cookie тавьдаг route handler тул Next-ийн
-                  <Link> prefetch хийвэл нэвтрэлтийн state-ийг дарж алдаа гаргана. */}
-              <a href="/auth/login" className="btn btn-primary">
-                Нэвтрэх
-              </a>
+    <div className="space-y-4">
+      {/* ── Танилцуулга ── */}
+      <section className="card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
+          <div>
+            <h2 className="text-[20px] font-medium leading-snug">
+              Санал, санаачилгын цахим платформ
+            </h2>
+            <p className="text-[13px] text-ink3 mt-1">
+              Оюутан · Багш · Ажилтан · Хариуцсан нэгжүүд
+            </p>
+          </div>
+          <div className="flex gap-8">
+            <div>
+              <div
+                className="text-[22px] font-semibold leading-tight tabular-nums"
+                style={{ color: "var(--brand)" }}
+              >
+                {fmtNum(members)}
+              </div>
+              <div className="text-[13px] text-ink3">Нийт гишүүн</div>
             </div>
+            <div>
+              <div className="text-[22px] font-semibold leading-tight tabular-nums">
+                {fmtNum(counts.reduce((a, b) => a + b, 0))}
+              </div>
+              <div className="text-[13px] text-ink3">Санаачилга</div>
+            </div>
+          </div>
+        </div>
+        <p className="text-[14.5px] text-ink2 mt-3 leading-relaxed">
+          Хувийн шинжтэй санал, гомдлоо нууцлалтайгаар хариуцсан нэгжид шууд илгээнэ. Олон хүнд
+          хамаатай асуудлаар нийтийн санаачилга дэвшүүлж дэмжлэг цуглуулна. Тогтоосон босгод
+          хүрсэн санаачилгад хариуцсан нэгж хуульд нийцсэн хугацаанд албан хариу өгөх үүрэг
+          хүлээнэ.
+        </p>
+
+        {!user && (
+          <div className="mt-4">
+            {/* Энгийн <a>: /auth/login нь cookie тавьдаг route handler тул Next-ийн
+                <Link> prefetch хийвэл нэвтрэлтийн state-ийг дарж алдаа гаргана. */}
+            <a href="/auth/login" className="btn btn-primary">
+              Нэвтрэх
+            </a>
+          </div>
+        )}
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 mt-4">
+          <Link href="/initiatives/new" className="choice">
+            <span className="choice-icon">
+              <IconBulb size={20} />
+            </span>
+            <div>
+              <div className="font-medium text-[14.5px]">Санаачилга</div>
+              <div className="hint">Олон хүнд хамаатай өөрчлөлт — дэмжлэг цуглуулна</div>
+            </div>
+          </Link>
+          <Link href="/requests/new" className="choice">
+            <span className="choice-icon">
+              <IconInbox size={20} />
+            </span>
+            <div>
+              <div className="font-medium text-[14.5px]">Санал, гомдол</div>
+              <div className="hint">Хувийн шинжтэй — нэгжид шууд очно</div>
+            </div>
+          </Link>
+        </div>
+      </section>
+
+      {(myDrafts > 0 || openRequests > 0) && user && (
+        <Notice tone="violet" title="Таны идэвхтэй хүсэлтүүд">
+          {myDrafts > 0 && (
+            <>
+              {myDrafts} санаачилга хяналтад эсвэл засварлахаар хүлээгдэж байна.{" "}
+            </>
           )}
+          {openRequests > 0 && (
+            <>
+              {openRequests} санал, гомдол шийдвэрлэгдэж байна.{" "}
+              <Link href="/requests" className="link">
+                Харах →
+              </Link>
+            </>
+          )}
+        </Notice>
+      )}
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 mt-4">
-            <Link href="/initiatives/new" className="choice">
-              <span className="choice-icon">
-                <IconBulb size={20} />
-              </span>
-              <div>
-                <div className="font-medium text-[14.5px]">Санаачилга</div>
-                <div className="hint">Олон хүнд хамаатай өөрчлөлт — дэмжлэг цуглуулна</div>
-              </div>
-            </Link>
-            <Link href="/requests/new" className="choice">
-              <span className="choice-icon">
-                <IconInbox size={20} />
-              </span>
-              <div>
-                <div className="font-medium text-[14.5px]">Санал, гомдол</div>
-                <div className="hint">Хувийн шинжтэй — нэгжид шууд очно</div>
-              </div>
-            </Link>
-          </div>
-        </section>
-
-        {(myDrafts > 0 || openRequests > 0) && user && (
-          <Notice tone="violet" title="Таны идэвхтэй хүсэлтүүд">
-            {myDrafts > 0 && (
-              <>
-                {myDrafts} санаачилга хяналтад эсвэл засварлахаар хүлээгдэж байна.{" "}
-              </>
-            )}
-            {openRequests > 0 && (
-              <>
-                {openRequests} санал, гомдол шийдвэрлэгдэж байна.{" "}
-                <Link href="/requests" className="link">
-                  Харах →
-                </Link>
-              </>
-            )}
-          </Notice>
-        )}
-
-        {/* ── Шүүлтүүр ── */}
-        <div className="tabs">
-          {INITIATIVE_TABS.map((t, i) => (
-            <Link
-              key={t.key}
-              href={qs({ tab: t.key })}
-              className="tab"
-              data-active={t.key === tab.key}
-            >
-              {t.label}
-              <span className="nav-count">{counts[i]}</span>
-            </Link>
-          ))}
-        </div>
-
-        <div className="card p-3 flex flex-wrap gap-2">
-          <Link href={qs({ cat: undefined })} className="tab" data-active={!sp.cat}>
-            Бүх ангилал
+      {/* ── Шүүлтүүр ── */}
+      <div className="tabs">
+        {INITIATIVE_TABS.map((t, i) => (
+          <Link
+            key={t.key}
+            href={qs({ tab: t.key })}
+            className="tab"
+            data-active={t.key === tab.key}
+          >
+            {t.label}
+            <span className="nav-count">{counts[i]}</span>
           </Link>
-          {categories.map((c) => (
-            <Link key={c.id} href={qs({ cat: c.code })} className="tab" data-active={sp.cat === c.code}>
-              {c.name}
-            </Link>
-          ))}
-        </div>
-
-        <div className="card p-3 flex flex-wrap gap-2">
-          <Link href={qs({ aud: undefined })} className="tab" data-active={!sp.aud}>
-            Бүх бүлэг
-          </Link>
-          {(Object.keys(AUDIENCES) as Audience[]).map((a) => (
-            <Link key={a} href={qs({ aud: a })} className="tab" data-active={sp.aud === a}>
-              {AUDIENCES[a].label}
-            </Link>
-          ))}
-        </div>
-
-        {/* ── Жагсаалт ── */}
-        {items.length === 0 ? (
-          <Empty text="Энэ шүүлтүүрт тохирох санаачилга алга байна." />
-        ) : (
-          <div className="space-y-3">
-            {items.map((i) => (
-              <InitiativeCard
-                key={i.id}
-                c={{ ...(i as unknown as InitiativeCardData), commentCount: commentBy.get(i.id) ?? 0 }}
-              />
-            ))}
-          </div>
-        )}
+        ))}
       </div>
 
-      {/* ── Хажуугийн багана ── */}
-      <aside className="space-y-3 lg:sticky lg:top-4">
-        {user && (
-          <Link href="/initiatives/new" className="btn btn-primary w-full">
-            <IconPlus />
-            Санаачилга дэвшүүлэх
+      <div className="card p-3 flex flex-wrap gap-2">
+        <Link href={qs({ cat: undefined })} className="tab" data-active={!sp.cat}>
+          Бүх ангилал
+        </Link>
+        {categories.map((c) => (
+          <Link key={c.id} href={qs({ cat: c.code })} className="tab" data-active={sp.cat === c.code}>
+            {c.name}
           </Link>
-        )}
+        ))}
+      </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <StatTile label="Нийт гишүүн" value={members} tone="blue" />
-          <StatTile label="Санаачилга" value={counts.reduce((a, b) => a + b, 0)} />
+      <div className="card p-3 flex flex-wrap gap-2">
+        <Link href={qs({ aud: undefined })} className="tab" data-active={!sp.aud}>
+          Бүх бүлэг
+        </Link>
+        {(Object.keys(AUDIENCES) as Audience[]).map((a) => (
+          <Link key={a} href={qs({ aud: a })} className="tab" data-active={sp.aud === a}>
+            {AUDIENCES[a].label}
+          </Link>
+        ))}
+      </div>
+
+      {/* ── Жагсаалт ── */}
+      {items.length === 0 ? (
+        <Empty text="Энэ шүүлтүүрт тохирох санаачилга алга байна." />
+      ) : (
+        <div className="space-y-3">
+          {items.map((i) => (
+            <InitiativeCard
+              key={i.id}
+              c={{ ...(i as unknown as InitiativeCardData), commentCount: commentBy.get(i.id) ?? 0 }}
+            />
+          ))}
         </div>
-      </aside>
+      )}
     </div>
   );
 }
