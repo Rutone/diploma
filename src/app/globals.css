@@ -433,6 +433,9 @@
     color: inherit;
   }
   .choice:hover { background: var(--surface-2); }
+  /* Нүүр хуудасны хоёр том товч — картын сүүдэртэй, арай өргөн зайтай. */
+  .home-choice { padding: 18px 20px; box-shadow: var(--shadow); border-color: var(--line); }
+  .home-choice:hover { border-color: var(--brand); background: var(--surface); }
   .choice:has(input:checked) {
     border-color: var(--brand);
     background: var(--brand-soft);

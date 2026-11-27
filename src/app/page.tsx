@@ -27,7 +27,7 @@ export default async function Home({
   ]);
   const cat = sp.cat ? categories.find((c) => c.code === sp.cat) : undefined;
 
-  const [items, counts, members, myDrafts, openRequests] = await Promise.all([
+  const [items, counts, myDrafts, openRequests] = await Promise.all([
     listInitiatives({
       statuses: tab.statuses as InitiativeStatus[],
       categoryId: cat?.id,
@@ -39,7 +39,6 @@ export default async function Home({
         prisma.initiative.count({ where: { status: { in: t.statuses as InitiativeStatus[] } } })
       )
     ),
-    prisma.user.count({ where: { active: true } }),
     user
       ? prisma.initiative.count({
           where: { authorId: user.id, status: { in: ["IN_REVIEW", "REJECTED"] } },
@@ -76,73 +75,29 @@ export default async function Home({
 
   return (
     <div className="space-y-4">
-      {/* ── Танилцуулга ── */}
-      <section className="card p-5">
-        <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
+      {/* ── Хоёр суваг руу орох товч ──
+          Гарчиг толгойд, тоонууд статистикт, нэвтрэх товч цэсэнд байгаа тул энд зөвхөн
+          хоёр үйлдэл үлдэнэ. Нэвтрээгүй хүнийг хоёр хуудас хоёулаа нэвтрэх рүү шилжүүлнэ. */}
+      <nav className="grid sm:grid-cols-2 gap-3" aria-label="Хүсэлт илгээх">
+        <Link href="/initiatives/new" className="choice home-choice">
+          <span className="choice-icon">
+            <IconBulb size={20} />
+          </span>
           <div>
-            <h2 className="text-[20px] font-medium leading-snug">
-              Санал, санаачилгын цахим платформ
-            </h2>
-            <p className="text-[13px] text-ink3 mt-1">
-              Оюутан · Багш · Ажилтан · Хариуцсан нэгжүүд
-            </p>
+            <div className="font-medium text-[15px]">Санаачилга</div>
+            <div className="hint">Олон хүнд хамаатай өөрчлөлт — дэмжлэг цуглуулна</div>
           </div>
-          <div className="flex gap-8">
-            <div>
-              <div
-                className="text-[22px] font-semibold leading-tight tabular-nums"
-                style={{ color: "var(--brand)" }}
-              >
-                {fmtNum(members)}
-              </div>
-              <div className="text-[13px] text-ink3">Нийт гишүүн</div>
-            </div>
-            <div>
-              <div className="text-[22px] font-semibold leading-tight tabular-nums">
-                {fmtNum(counts.reduce((a, b) => a + b, 0))}
-              </div>
-              <div className="text-[13px] text-ink3">Санаачилга</div>
-            </div>
+        </Link>
+        <Link href="/requests/new" className="choice home-choice">
+          <span className="choice-icon">
+            <IconInbox size={20} />
+          </span>
+          <div>
+            <div className="font-medium text-[15px]">Санал, гомдол</div>
+            <div className="hint">Хувийн шинжтэй — нэгжид шууд очно</div>
           </div>
-        </div>
-        <p className="text-[14.5px] text-ink2 mt-3 leading-relaxed">
-          Хувийн шинжтэй санал, гомдлоо нууцлалтайгаар хариуцсан нэгжид шууд илгээнэ. Олон хүнд
-          хамаатай асуудлаар нийтийн санаачилга дэвшүүлж дэмжлэг цуглуулна. Тогтоосон босгод
-          хүрсэн санаачилгад хариуцсан нэгж хуульд нийцсэн хугацаанд албан хариу өгөх үүрэг
-          хүлээнэ.
-        </p>
-
-        {!user && (
-          <div className="mt-4">
-            {/* Энгийн <a>: /auth/login нь cookie тавьдаг route handler тул Next-ийн
-                <Link> prefetch хийвэл нэвтрэлтийн state-ийг дарж алдаа гаргана. */}
-            <a href="/auth/login" className="btn btn-primary">
-              Нэвтрэх
-            </a>
-          </div>
-        )}
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 mt-4">
-          <Link href="/initiatives/new" className="choice">
-            <span className="choice-icon">
-              <IconBulb size={20} />
-            </span>
-            <div>
-              <div className="font-medium text-[14.5px]">Санаачилга</div>
-              <div className="hint">Олон хүнд хамаатай өөрчлөлт — дэмжлэг цуглуулна</div>
-            </div>
-          </Link>
-          <Link href="/requests/new" className="choice">
-            <span className="choice-icon">
-              <IconInbox size={20} />
-            </span>
-            <div>
-              <div className="font-medium text-[14.5px]">Санал, гомдол</div>
-              <div className="hint">Хувийн шинжтэй — нэгжид шууд очно</div>
-            </div>
-          </Link>
-        </div>
-      </section>
+        </Link>
+      </nav>
 
       {(myDrafts > 0 || openRequests > 0) && user && (
         <Notice tone="violet" title="Таны идэвхтэй хүсэлтүүд">
