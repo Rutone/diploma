@@ -2,12 +2,9 @@ import Link from "next/link";
 import { prisma, type Audience, type InitiativeStatus } from "@/lib/prisma";
 import { currentUser } from "@/lib/auth/session";
 import { listInitiatives } from "@/lib/domain/initiatives";
-import { getThresholdParams } from "@/lib/settings";
-import { computeThreshold } from "@/lib/rules/threshold";
 import { AUDIENCES, INITIATIVE_TABS } from "@/lib/labels";
 import { InitiativeCard, Empty, Notice, StatTile, type InitiativeCardData } from "@/components/ui";
 import { IconBulb, IconInbox, IconPlus } from "@/components/icons";
-import { fmtNum } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +24,7 @@ export default async function Home({
   ]);
   const cat = sp.cat ? categories.find((c) => c.code === sp.cat) : undefined;
 
-  const [items, counts, members, params, myDrafts, openRequests] = await Promise.all([
+  const [items, counts, members, myDrafts, openRequests] = await Promise.all([
     listInitiatives({
       statuses: tab.statuses as InitiativeStatus[],
       categoryId: cat?.id,
@@ -40,7 +37,6 @@ export default async function Home({
       )
     ),
     prisma.user.count({ where: { active: true } }),
-    getThresholdParams(),
     user
       ? prisma.initiative.count({
           where: { authorId: user.id, status: { in: ["IN_REVIEW", "REJECTED"] } },
@@ -74,8 +70,6 @@ export default async function Home({
     const s = p.toString();
     return s ? `/?${s}` : "/";
   };
-
-  const universityThreshold = computeThreshold(members, params);
 
   return (
     <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-5 items-start">
@@ -222,40 +216,6 @@ export default async function Home({
               </li>
             ))}
           </ol>
-        </div>
-
-        <div className="card p-4">
-          <h3 className="sec-title mb-3">Дэмжлэгийн босго</h3>
-          <p className="text-[13.5px] text-ink2 leading-relaxed">
-            Босгыг тогтмол тоогоор бус, санаачилгын хамрах хүрээний гишүүдийн тооноос (N) систем
-            автоматаар тооцно:
-          </p>
-          <p className="my-3 text-center text-[15px] tabular-nums" style={{ color: "var(--brand)" }}>
-            B = ⌈max(p·N, min(T<sub>min</sub>, q·N))⌉
-          </p>
-          <div className="space-y-1 text-[13.5px] text-ink2">
-            <div className="flex justify-between">
-              <span>p — үндсэн хувь</span>
-              <span className="tabular-nums">{(params.p * 100).toFixed(1)}%</span>
-            </div>
-            <div className="flex justify-between">
-              <span>
-                T<sub>min</sub> — доод хязгаар
-              </span>
-              <span className="tabular-nums">{params.tMin}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>q — дээд таг</span>
-              <span className="tabular-nums">{(params.q * 100).toFixed(0)}%</span>
-            </div>
-          </div>
-          <p className="hint mt-3">
-            Их сургууль даяарх санаачилгад N = {fmtNum(members)} тул босго {universityThreshold}{" "}
-            байна. Босго батлах үед хөлдөх тул явцын дунд өөрчлөгдөхгүй.
-          </p>
-          <Link href="/policy#threshold" className="link text-[13.5px] mt-2 inline-block">
-            Бүрэн журам үзэх →
-          </Link>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
