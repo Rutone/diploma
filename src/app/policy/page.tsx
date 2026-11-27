@@ -38,28 +38,28 @@ export default async function PolicyPage() {
 
   return (
     <div className="mx-auto max-w-[840px] space-y-4">
-      <div>
-        <h2 className="text-[19px] font-medium">Журам, бодлого</h2>
-        <p className="text-[13.5px] text-ink3 mt-0.5">
-          Энэ хуудасны бүх тоо системийн бодит тохиргооноос уншигдаж байна — админ өөрчлөхөд
-          энд шууд тусна.
-        </p>
-      </div>
+      {/* Хуудасны гарчиг толгойн мөрөнд (shell) байгаа тул энд зөвхөн тайлбар. */}
+      <p className="text-[13.5px] text-ink3">
+        Энэ хуудасны бүх тоо системийн бодит тохиргооноос уншигдаж байна — админ өөрчлөхөд
+        энд шууд тусна.
+      </p>
 
       <Section id="channels" title="Хоёр суваг">
+        <p>Платформ хүсэлтийг шинж чанараар нь хоёр сувагт ялгана.</p>
+
+        <h4 className="policy-sub">Хаалттай суваг — санал, гомдол</h4>
         <p>
-          Платформ хүсэлтийг шинж чанараар нь хоёр сувагт ялгана.
+          Хувь хүнд хамаарах асуудал. Дэмжлэг цуглуулахгүйгээр хариуцсан нэгжид шууд очно.
+          Зөвхөн гаргагч, хариуцсан нэгж, модератор харна.
         </p>
+
+        <h4 className="policy-sub">Нээлттэй суваг — нийтийн санаачилга</h4>
         <p>
-          <strong>Хаалттай суваг — санал, гомдол.</strong> Хувь хүнд хамаарах асуудал. Дэмжлэг
-          цуглуулахгүйгээр хариуцсан нэгжид шууд очно. Зөвхөн гаргагч, хариуцсан нэгж, модератор
-          харна.
+          Олон нийтэд хамаарах асуудал. Гишүүдийн дэмжлэгийг цуглуулж, тогтоосон босгод хүрмэгц
+          хариуцсан нэгжээс албан хариу авах эрх нээгдэнэ.
         </p>
-        <p>
-          <strong>Нээлттэй суваг — нийтийн санаачилга.</strong> Олон нийтэд хамаарах асуудал.
-          Гишүүдийн дэмжлэгийг цуглуулж, тогтоосон босгод хүрмэгц хариуцсан нэгжээс албан хариу
-          авах эрх нээгдэнэ.
-        </p>
+
+        <h4 className="policy-sub">Сувгийн хооронд шилжих</h4>
         <p>
           Хаалттай гомдолд хугацаандаа хариу ирээгүй, эсвэл хариу хангалтгүй бол{" "}
           <strong>зөвхөн гаргагч өөрөө</strong> үүнийг нийтийн санаачилга болгон хөрвүүлж болно.
@@ -115,11 +115,14 @@ export default async function PolicyPage() {
       </Section>
 
       <Section id="threshold" title="Дэмжлэгийн босго">
+        <h4 className="policy-sub">Босгын зорилго</h4>
         <p>
           Босго нь олонхын дэмжлэгийг хэмждэггүй. Босго нь зөвхөн гурван зүйлийг батална:
           асуудал хувь хүний хүрээнээс хальсан эсэх; хариу өгөхөд зарцуулах ажлын цагийг
           зөвтгөх эсэх; систем ажиллагаатай хэвээр байх эсэх.
         </p>
+
+        <h4 className="policy-sub">Тооцох томьёо</h4>
         <p className="text-center text-[16px] py-2" style={{ color: "var(--brand)" }}>
           B = ⌈max(p·N, min(T<sub>min</sub>, q·N))⌉
         </p>
@@ -141,6 +144,8 @@ export default async function PolicyPage() {
             хүрэхгүй.
           </li>
         </ul>
+
+        <h4 className="policy-sub">Хамрах хүрээний хэмжээгээрх босго</h4>
         <div className="overflow-x-auto">
           <table className="w-full text-[14px]">
             <thead>
@@ -166,11 +171,14 @@ export default async function PolicyPage() {
             </tbody>
           </table>
         </div>
+        <h4 className="policy-sub">Босго тогтвортой байх</h4>
         <Notice tone="gray">
           Босго нь санаачилга <strong>батлагдах үед нэг удаа</strong> тооцогдож хадгалагдана.
           Дараа нь параметр өөрчлөгдсөн ч тухайн санаачилгын босго хөдлөхгүй — цуглуулж байх
           хугацаанд «зорилт» шилжихгүй. Модератор босгын тоонд шууд нөлөөлөх боломжгүй.
         </Notice>
+
+        <h4 className="policy-sub">Улирлын тохируулга</h4>
         <p>
           Улирал бүрийн эцэст систем босго давсан санаачилгын хувийг тооцно. Энэ нь{" "}
           {pct(TARGET_SUCCESS_RATE.min)}–{pct(TARGET_SUCCESS_RATE.max)}-ийн хүрээнээс гарвал
@@ -184,6 +192,8 @@ export default async function PolicyPage() {
           Санаачилга үүсгэхдээ хоёр зүйлийг сонгоно: зохион байгуулалтын хүрээ болон хамрах
           бүлэг. Хоёрын огтлолцол нь N-ийг тодорхойлно.
         </p>
+
+        <h4 className="policy-sub">Зохион байгуулалтын хүрээ</h4>
         <ul className="space-y-1.5 list-disc pl-5">
           {(Object.keys(SCOPES) as (keyof typeof SCOPES)[]).map((s) => (
             <li key={s}>
@@ -191,6 +201,8 @@ export default async function PolicyPage() {
             </li>
           ))}
         </ul>
+
+        <h4 className="policy-sub">Хамрах бүлэг</h4>
         <ul className="space-y-1.5 list-disc pl-5">
           {(Object.keys(AUDIENCES) as (keyof typeof AUDIENCES)[]).map((a) => (
             <li key={a}>
@@ -198,6 +210,8 @@ export default async function PolicyPage() {
             </li>
           ))}
         </ul>
+
+        <h4 className="policy-sub">Дэмжих эрх</h4>
         <p>
           Гишүүн бүр санаачилгыг <strong>нэг л удаа</strong> дэмжинэ. Давхардлыг SSO танигчаар
           болон өгөгдлийн сангийн давтагдашгүй хязгаарлалтаар хоёр түвшинд хаана. Хамрах
@@ -206,37 +220,44 @@ export default async function PolicyPage() {
       </Section>
 
       <Section id="calendar" title="Хичээлийн хуанли ба зогсолт">
+        <h4 className="policy-sub">Хичээлийн өдрөөр тоолох хугацаа</h4>
         <p>
           Дотоод журмын хугацаа — дэмжлэг цуглуулах {deadlines.collectDays} хоног, босго давснаас
           хойш хариу өгөх {deadlines.initiativeResponseDays} хоног — нь{" "}
           <strong>хичээлийн өдрөөр</strong> тоологдоно: амралтын үеүдийг алгасна. Ингэснээр
           оюутнууд байхгүй үед дэмжлэгийн хугацаа «шатахаас» сэргийлнэ.
         </p>
+        <h4 className="policy-sub">Хуулийн дээд хязгаар</h4>
         <p>
           Хариу өгөх хугацааны хуанлийн нийт хоног {deadlines.maxResponseCalendarDays}-аас
           хэтэрвэл тэрхүү хуулийн дээд хязгаараар хязгаарлана.
         </p>
         {breaks.length > 0 && (
-          <div className="space-y-1">
-            <p className="font-medium text-ink">Бүртгэгдсэн амралтын үеүд:</p>
-            {breaks.map((b) => (
-              <div key={b.name + b.startsOn} className="flex justify-between text-[14px]">
-                <span>{b.name}</span>
-                <span className="tabular-nums text-ink3">
-                  {b.startsOn} … {b.endsOn}
-                </span>
-              </div>
-            ))}
-          </div>
+          <>
+            <h4 className="policy-sub">Бүртгэгдсэн амралтын үеүд</h4>
+            <div className="space-y-1">
+              {breaks.map((b) => (
+                <div key={b.name + b.startsOn} className="flex justify-between text-[14px]">
+                  <span>{b.name}</span>
+                  <span className="tabular-nums text-ink3">
+                    {b.startsOn} … {b.endsOn}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </Section>
 
       <Section id="routing" title="Хүсэлт чиглүүлэх">
+        <h4 className="policy-sub">Автомат чиглүүлэлт</h4>
         <p>
           Хэрэглэгч хариуцсан нэгжийг <strong>өөрөө сонгохгүй</strong> — зөвхөн ангилал сонгоно.
           Систем «ангилал → нэгж» хүснэгтийн дагуу автоматаар чиглүүлнэ. Нэгж тохируулаагүй
           ангиллын хүсэлтийг модератор гараар чиглүүлнэ.
         </p>
+
+        <h4 className="policy-sub">Ангилал ба хариуцах нэгж</h4>
         <div className="overflow-x-auto">
           <table className="w-full text-[14px]">
             <thead>
@@ -257,6 +278,7 @@ export default async function PolicyPage() {
             </tbody>
           </table>
         </div>
+        <h4 className="policy-sub">Буцаах журам</h4>
         <p>
           Хариуцсан нэгж өөрт хамааралгүй хүсэлтийг шалтгаантайгаар буцаана. Буцаасан хүсэлт
           модераторт очиж дахин чиглүүлэгдэнэ — хугацаа ЗОГСОХГҮЙ.
@@ -264,22 +286,30 @@ export default async function PolicyPage() {
       </Section>
 
       <Section id="moderation" title="Модерацийн журам">
+        <h4 className="policy-sub">Хянах хугацаа</h4>
         <p>
           Модератор шинэ санаачилгыг нийтэд нээхээс өмнө агуулгын дүрэмд нийцэж байгаа эсэхийг{" "}
-          {moderation.reviewHours} цагийн дотор хянана. Татгалзах шалтгаан нь{" "}
-          <strong>урьдчилан нийтлэгдсэн</strong> жагсаалтаас сонгогдоно:
+          {moderation.reviewHours} цагийн дотор хянана.
+        </p>
+
+        <h4 className="policy-sub">Татгалзах шалтгаан</h4>
+        <p>
+          Татгалзах шалтгаан нь <strong>урьдчилан нийтлэгдсэн</strong> жагсаалтаас сонгогдоно:
         </p>
         <ul className="space-y-1 list-disc pl-5">
           {Object.values(REJECTION_REASONS).map((r) => (
             <li key={r}>{r}</li>
           ))}
         </ul>
-        <Notice tone="gray" title="Модераторын эрхийн хязгаар">
+
+        <h4 className="policy-sub">Модераторын эрхийн хязгаар</h4>
+        <Notice tone="gray">
           Модератор <strong>босгын тоо, хугацааг гараар өөрчлөх эрхгүй</strong>. Зөвхөн хамрах
           хүрээг шалтгаантайгаар засч чадна, тэр ч хяналтын шатанд л боломжтой. Татгалзах, нуух,
           хамрах хүрээ засах, дахин чиглүүлэх үйлдэл бүрт шалтгаан заавал бичигдэж, аудитын
           бүртгэлд устгагдахгүйгээр хадгалагдана. Шалтгаан нь санаачлагчид харагдана.
         </Notice>
+        <h4 className="policy-sub">Тайлбар, хариуны шаардлага</h4>
         <p>
           Татгалзах, буцаах тайлбар дор хаяж {moderation.reasonMinChars} тэмдэгт, албан хариу дор
           хаяж {moderation.responseMinChars} тэмдэгт байх ёстой — «Шийдэгдлээ» гэсэн ганц үг
@@ -288,6 +318,7 @@ export default async function PolicyPage() {
       </Section>
 
       <Section id="privacy" title="Нууцлалын бодлого">
+        <h4 className="policy-sub">Хувийн мэдээлэл хамгаалах</h4>
         <ul className="space-y-1.5 list-disc pl-5">
           <li>
             Хувийн мэдээллийг «Хүний хувийн мэдээлэл хамгаалах тухай хууль»-д нийцүүлэн
@@ -298,23 +329,35 @@ export default async function PolicyPage() {
             харагдана.
           </li>
           <li>
-            Хаалттай сувгийн санал, гомдлыг зөвхөн гаргагч, хариуцсан нэгж, модератор харна.
-            Эрхгүй хандалтад сервер 403 алдаа буцаана.
-          </li>
-          <li>
             Нэрээ нууцлах сонголт хийсэн тохиолдолд хариуцагчид илгээгчийн нэр харагдахгүй.
             Хариу нь илгээгчид хэвээр хүрнэ.
+          </li>
+        </ul>
+
+        <h4 className="policy-sub">Хандах эрх ба аюулгүй байдал</h4>
+        <ul className="space-y-1.5 list-disc pl-5">
+          <li>
+            Хаалттай сувгийн санал, гомдлыг зөвхөн гаргагч, хариуцсан нэгж, модератор харна.
+            Эрхгүй хандалтад сервер 403 алдаа буцаана.
           </li>
           <li>Бүх холболт HTTPS; сесс httpOnly, Secure cookie-д хадгалагдана.</li>
         </ul>
       </Section>
 
       <Section id="appeal" title="Давж заалдах">
+        <h4 className="policy-sub">Модераторын шийдвэрт</h4>
         <p>
           Модераторын шийдвэртэй санал нийлэхгүй бол санаачлагч тайлбарыг үндэслэн засварлаж
-          дахин илгээх эрхтэй. Нэгжийн албан хариу хангалтгүй гэж үзвэл гаргагч хүсэлтээ нийтийн
-          санаачилга болгон хөрвүүлж, бусад гишүүдийн дэмжлэгээр асуудлыг дахин хөндөж болно.
+          дахин илгээх эрхтэй.
         </p>
+
+        <h4 className="policy-sub">Нэгжийн хариунд</h4>
+        <p>
+          Нэгжийн албан хариу хангалтгүй гэж үзвэл гаргагч хүсэлтээ нийтийн санаачилга болгон
+          хөрвүүлж, бусад гишүүдийн дэмжлэгээр асуудлыг дахин хөндөж болно.
+        </p>
+
+        <h4 className="policy-sub">Ил тод байдал</h4>
         <p>
           Хугацаа хэтэрсэн бүх хүсэлт нийтийн статистикт ил харагдана — хариуцлагын механизм нь
           ил тод байдал дээр суурилна.
