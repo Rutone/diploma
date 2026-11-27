@@ -44,20 +44,6 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const u = await currentUser();
 
-  const [collecting, overdueRequests, overdueInitiatives, answered, onTimeAnswered] =
-    await Promise.all([
-      prisma.initiative.count({ where: { status: { in: ["COLLECTING", "PAUSED"] } } }),
-      prisma.request.count({ where: { status: "OVERDUE" } }),
-      prisma.initiative.count({ where: { status: "OVERDUE" } }),
-      prisma.request.count({ where: { status: { in: ["ANSWERED", "CLOSED"] } } }),
-      prisma.$queryRaw<{ n: bigint }[]>`
-        SELECT COUNT(*)::bigint AS n FROM "request"
-        WHERE "answered_at" IS NOT NULL AND "answered_at" <= "due_at"`,
-    ]);
-
-  const onTime =
-    answered > 0 ? Math.round((Number(onTimeAnswered[0]?.n ?? 0) / answered) * 100) : null;
-
   let desk: number | null = null;
   let queue: number | null = null;
   let unread = 0;
@@ -100,11 +86,7 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: BOOT_SCRIPT }} />
       </head>
       <body>
-        <Shell
-          user={user}
-          stats={{ collecting, overdue: overdueRequests + overdueInitiatives, onTime }}
-          today={fmtLongDate()}
-        >
+        <Shell user={user} today={fmtLongDate()}>
           {children}
         </Shell>
       </body>

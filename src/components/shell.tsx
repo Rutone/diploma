@@ -8,7 +8,7 @@ import { logout } from "@/app/actions";
 import Footer from "./footer";
 import {
   IconMenu, IconClose, IconMoon, IconSun, IconUser, IconCalendar,
-  IconClock, IconChart, IconLogout, IconInbox, IconChevronDown,
+  IconLogout, IconChevronDown,
 } from "./icons";
 import type { Role } from "@/lib/prisma";
 
@@ -24,8 +24,6 @@ export type ShellUser = {
   /** Уншаагүй мэдэгдэл (FR-28). */
   unread: number;
 } | null;
-
-export type ShellStats = { collecting: number; overdue: number; onTime: number | null };
 
 const TITLES: [RegExp, string][] = [
   [/^\/$/, "Нүүр"],
@@ -66,12 +64,10 @@ function leafActive(path: string, href: string): boolean {
 
 export default function Shell({
   user,
-  stats,
   today,
   children,
 }: {
   user: ShellUser;
-  stats: ShellStats;
   today: string;
   children: React.ReactNode;
 }) {
@@ -304,31 +300,13 @@ export default function Shell({
       {/* ── Үндсэн хэсэг ── */}
       <main className="flex-1 px-4 sm:px-8 py-6 sm:py-7">
         <div className="mx-auto max-w-[1180px]">
-          {/* Хуудасны гарчиг + системийн товч үзүүлэлт + огноо */}
+          {/* Хуудасны гарчиг + огноо */}
           <div className="page-head">
             <h1 className="text-[19px] font-semibold">{titleFor(path)}</h1>
-            <div className="page-head-meta">
-              <span className="page-stat" title="Дэмжлэг цуглуулж буй санаачилга">
-                <IconChart size={15} />
-                {stats.collecting} цуглуулж буй
-              </span>
-              <span
-                className="page-stat"
-                title="Хугацаа хэтэрсэн хүсэлт"
-                style={stats.overdue > 0 ? { color: "var(--bad)" } : undefined}
-              >
-                <IconClock size={15} />
-                {stats.overdue} хоцорсон
-              </span>
-              <span className="page-stat" title="Хугацаандаа хариулсан хувь">
-                <IconInbox size={15} />
-                {stats.onTime === null ? "—" : `${stats.onTime}%`} хугацаандаа
-              </span>
-              <span className="page-stat page-date">
-                <IconCalendar size={15} />
-                {today}
-              </span>
-            </div>
+            <span className="page-stat page-date">
+              <IconCalendar size={15} />
+              {today}
+            </span>
           </div>
 
           {children}

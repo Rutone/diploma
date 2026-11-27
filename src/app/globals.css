@@ -1030,12 +1030,6 @@ main table th {
     gap: 8px 20px;
     margin-bottom: 20px;
   }
-  .page-head-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 18px;
-  }
   .page-stat {
     display: inline-flex;
     align-items: center;
