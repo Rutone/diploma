@@ -868,6 +868,8 @@ main table th {
     font-size: 15px;
     line-height: 1.25;
     color: var(--ink);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
   }
   .head-title-main { display: block; font-size: 18px; font-weight: 600; }
   .head-title-sub { display: block; }
